@@ -1,0 +1,58 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/voxflow-core",
+    "crates/voxflow-audio",
+    "crates/voxflow-vad",
+    "crates/voxflow-transcribe",
+    "crates/voxflow-router",
+    "crates/voxflow-insert",
+    "crates/voxflow-history",
+    "crates/voxflow-cost",
+    "crates/voxflow-config",
+    "crates/voxflow-ffi",
+    "apps/linux-cosmic",
+]
+default-members = ["crates/voxflow-ffi"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["MaskedSyntax"]
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+cpal = "0.15"
+directories = "5"
+hound = "3"
+parking_lot = "0.12"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uniffi = { version = "0.28", features = ["cli"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+webrtc-vad = "0.4"
+
+voxflow-audio = { path = "crates/voxflow-audio" }
+voxflow-config = { path = "crates/voxflow-config" }
+voxflow-core = { path = "crates/voxflow-core" }
+voxflow-cost = { path = "crates/voxflow-cost" }
+voxflow-history = { path = "crates/voxflow-history" }
+voxflow-insert = { path = "crates/voxflow-insert" }
+voxflow-router = { path = "crates/voxflow-router" }
+voxflow-transcribe = { path = "crates/voxflow-transcribe" }
+voxflow-vad = { path = "crates/voxflow-vad" }
+
+[profile.release]
+lto = true
+codegen-units = 1

@@ -1,0 +1,12 @@
+[package]
+name = "voxflow-router"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+voxflow-config.workspace = true
+voxflow-cost.workspace = true

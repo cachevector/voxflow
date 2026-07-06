@@ -1,0 +1,11 @@
+[package]
+name = "voxflow-insert"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+thiserror.workspace = true

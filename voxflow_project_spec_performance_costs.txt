@@ -1,0 +1,919 @@
+VOXFLOW PROJECT SPEC
+Cross-platform native AI dictation for macOS, Linux COSMIC, and Windows
+Updated: 2026-07-06
+
+============================================================
+0. PRODUCT IDENTITY
+============================================================
+
+Product name: VoxFlow
+Domain: voxflow.maskedsyntax.com
+Category: Native AI dictation / OS-level writing layer / BYOK voice input
+Primary platform: macOS
+Secondary platform: Linux COSMIC
+Third platform: Windows 11
+Core idea: A small, native-feeling voice bar that appears only when needed, listens instantly, transcribes quickly, cleans up speech, and inserts text into the current app without interrupting the user's flow.
+
+One-line positioning:
+VoxFlow is a fast, native, BYOK voice input layer for your desktop.
+
+Sharper positioning:
+Speak anywhere. VoxFlow turns your voice into clean text inside the app you are already using.
+
+Developer-focused positioning:
+A native AI keyboard for macOS, Linux, and Windows. Dictate, rewrite, command, and paste across any app.
+
+Primary business angle:
+Not another AI subscription. VoxFlow is BYOK-first, local-capable, Linux-friendly, and built for people who care about speed, privacy, and control.
+
+============================================================
+1. DOMAIN DECISION: voxflow.maskedsyntax.com
+============================================================
+
+Decision: Use voxflow.maskedsyntax.com for now.
+
+This is the right decision for the current stage.
+
+Why it is right:
+- No new domain cost.
+- Faster to launch.
+- Keeps the product under your existing MaskedSyntax brand.
+- Good enough for waitlist, beta, early users, demos, and social launches.
+- You can validate demand before spending money on branding.
+- It lets you ship multiple indie products under the same parent studio.
+
+Potential downside:
+- A subdomain can feel slightly less serious than a dedicated .app/.com domain once the product starts making money.
+- If VoxFlow becomes your flagship app, a dedicated domain will look cleaner for SEO, press, ads, and long-term trust.
+
+Recommended path:
+Phase 1: Use voxflow.maskedsyntax.com for MVP, waitlist, beta, and early paid users.
+Phase 2: If VoxFlow reaches 50-100 active users or $500+/month revenue, consider buying voxflow.app, getvoxflow.com, voxflow.ai, or voxflow.dev if available.
+Phase 3: Keep voxflow.maskedsyntax.com as a redirect even if you buy a dedicated domain.
+
+Verdict:
+Use the subdomain now. Do not let domain buying slow the product down. The product experience matters much more than the domain at this stage.
+
+============================================================
+2. MARKET CONTEXT
+============================================================
+
+Wispr Flow is strong because it is fast, polished, and system-wide. If VoxFlow is slow, clunky, ugly, or unreliable, Wispr Flow and similar products will easily push it down.
+
+Current competitive reference points:
+- Wispr Flow supports macOS, Windows, iOS, and Android according to its official device requirements and website. It does not list Linux as a supported desktop platform.
+- Wispr Flow pricing is positioned as a subscription product, with public pages showing Pro pricing around $15/month monthly or around $12/month annually.
+- OpenAI gpt-4o-mini-transcribe is listed at $0.003/minute and gpt-4o-transcribe at $0.006/minute on OpenAI pricing pages.
+
+Sources checked on 2026-07-06:
+- https://wisprflow.ai/pricing
+- https://docs.wisprflow.ai/articles/1036674442-supported-devices-and-system-requirements
+- https://wisprflow.ai/
+- https://developers.openai.com/api/docs/pricing
+
+Main opportunity:
+A fast, beautiful, native-feeling, BYOK-first dictation app for macOS + Linux + Windows, with Linux COSMIC treated as a first-class target instead of an afterthought.
+
+============================================================
+3. PRODUCT PHILOSOPHY
+============================================================
+
+VoxFlow should feel like an OS feature, not like another productivity app.
+
+Rules:
+- Never steal focus unless necessary.
+- Never open a large window during dictation.
+- Never make the user copy/paste manually unless insertion fails.
+- Never show too much UI while recording.
+- Never block the current app with a modal unless permission is required.
+- Always prioritize perceived speed.
+- Always give a fallback path.
+- Always make the user feel in control.
+
+Core values:
+- Fast enough to trust.
+- Native enough to blend in.
+- Cheap enough to use daily.
+- Private enough to recommend.
+- Calm enough to avoid interrupting flow.
+
+============================================================
+4. PRIMARY USER EXPERIENCE
+============================================================
+
+Ideal flow:
+1. User places cursor in any text field.
+2. User presses and holds global hotkey.
+3. VoxFlow's small rounded bar appears at the bottom of the screen.
+4. Recording starts immediately.
+5. User speaks naturally.
+6. User releases hotkey.
+7. VoxFlow instantly finalizes audio.
+8. Local VAD trims silence.
+9. Transcription starts.
+10. Optional cleanup rewrites the result.
+11. Final text is inserted into the active app.
+12. Bar disappears.
+
+The interaction should feel like:
+Press -> speak -> release -> text appears.
+
+Target perceived latency:
+- Bar appears: under 80 ms.
+- Recording starts: under 100 ms.
+- End-of-speech detection: under 250 ms after release.
+- First transcription result for short speech: under 800 ms when possible.
+- Final text insertion: ideally under 1.5 seconds for short snippets.
+- For longer speech: show progress but avoid feeling stuck.
+
+============================================================
+5. PERFORMANCE IS THE PRODUCT
+============================================================
+
+VoxFlow cannot win if it is only cheaper. It must feel faster, calmer, and more reliable.
+
+Performance principles:
+- Keep the app resident in memory.
+- Preload the selected local model after launch.
+- Keep audio pipeline warm after first use.
+- Use push-to-talk first because it avoids expensive always-listening complexity.
+- Use VAD to avoid sending silence to cloud APIs.
+- Stream or chunk intelligently depending on provider.
+- Cache permission status and active app context.
+- Avoid heavy UI rendering during recording.
+- Use native/global APIs for hotkeys and text insertion instead of slow automation where possible.
+- Never wait for rewrite if plain transcription is already good enough.
+
+Performance budget:
+- Idle CPU: below 1-2% on normal desktop machines.
+- Recording CPU: below 5-8% for capture + VAD.
+- Local transcription CPU/GPU: depends on model, but must not freeze UI.
+- Memory: keep MVP under 300-500 MB with small local model loaded.
+- Battery: provide battery saver mode on laptops.
+
+Important UX detail:
+Show progress in a tiny calm way. The user should always know whether VoxFlow is listening, processing, inserting, or done.
+
+Recommended state labels:
+- Listening
+- Cleaning
+- Inserting
+- Copied
+- Done
+
+Avoid scary labels like:
+- Uploading
+- Waiting for API
+- Processing request
+
+============================================================
+6. LATENCY ARCHITECTURE
+============================================================
+
+Pipeline:
+
+Hotkey trigger
+-> Wake audio session
+-> Capture PCM audio
+-> VAD trims silence
+-> Noise suppression / gain normalization
+-> Segment audio
+-> Transcription route decision
+-> Transcribe
+-> Optional cleanup
+-> Insert text
+-> Store history locally
+
+Key optimizations:
+
+1. Pre-warm microphone
+Do not initialize microphone from zero every time. Ask permission once, then keep a lightweight audio capture path ready.
+
+2. Use VAD before transcription
+Use WebRTC VAD, Silero VAD, or a lightweight Rust-compatible VAD. This reduces cost and latency by cutting silence.
+
+3. Use short utterance mode
+Most dictation is 2-15 seconds. Optimize for this case first.
+
+4. Use local fallback instantly
+For very short commands like "thanks", "yes", "ship it", local tiny/base model can be enough.
+
+5. Separate transcription from cleanup
+Do not run AI cleanup on every utterance by default. Use cheap cleanup rules first.
+
+6. Insert immediately when confidence is high
+If transcript is simple and high confidence, insert without cloud rewrite.
+
+7. Parallelize cautiously
+For cloud mode, upload compressed audio while final local VAD boundary is being computed if streaming is supported.
+
+8. Model routing
+Use different models for different cases:
+- Short casual phrase: local small model or gpt-4o-mini-transcribe.
+- Long professional text: gpt-4o-mini-transcribe + cheap text cleanup.
+- High-accuracy mode: gpt-4o-transcribe.
+- Offline mode: whisper.cpp / faster-whisper local.
+
+============================================================
+7. COST ARCHITECTURE
+============================================================
+
+Goal:
+For BYOK users, keep normal usage under Rs.400/month and ideally under Rs.150-250/month.
+
+OpenAI transcription reference:
+- gpt-4o-mini-transcribe: $0.003/minute.
+- gpt-4o-transcribe: $0.006/minute.
+
+Approximate INR calculation using Rs.83-$1 for planning:
+- $0.003/minute = about Rs.0.25/minute.
+- $0.006/minute = about Rs.0.50/minute.
+
+Usage scenarios with gpt-4o-mini-transcribe:
+
+10 min/day x 30 days = 300 min/month
+Cost: $0.90/month = about Rs.75/month
+
+20 min/day x 30 days = 600 min/month
+Cost: $1.80/month = about Rs.150/month
+
+30 min/day x 30 days = 900 min/month
+Cost: $2.70/month = about Rs.225/month
+
+45 min/day x 30 days = 1350 min/month
+Cost: $4.05/month = about Rs.336/month
+
+60 min/day x 30 days = 1800 min/month
+Cost: $5.40/month = about Rs.448/month
+
+Conclusion:
+If the user dictates under 45 minutes/day using gpt-4o-mini-transcribe, the cost can stay under around Rs.400/month. If they dictate around 1 hour/day, it can exceed Rs.400/month.
+
+How VoxFlow keeps costs down:
+
+1. VAD silence trimming
+Do not bill silence.
+
+2. Push-to-talk first
+Avoid accidental background recording.
+
+3. Local-first routing
+Use local model for short/simple phrases.
+
+4. API only when needed
+Cloud is used for harder audio, noisy input, long text, or high-accuracy mode.
+
+5. No automatic rewrite by default
+AI rewrite can cost extra tokens. Use it only in selected modes.
+
+6. User cost dashboard
+Show estimated monthly cost based on minutes used.
+
+7. Provider choice
+Support OpenAI first, then optionally Groq, Deepgram, AssemblyAI, Gemini, OpenRouter, and local Whisper.
+
+8. Quality modes
+- Economy: local + gpt-4o-mini only.
+- Balanced: gpt-4o-mini + cleanup.
+- Accurate: gpt-4o-transcribe.
+- Offline: local only.
+
+9. Max session cap
+Optional setting: stop recording after 60/120/300 seconds to prevent accidental cost.
+
+10. Auto-detect silence
+Stop recording after long silence if toggle mode is enabled.
+
+Cost positioning:
+VoxFlow should not promise that BYOK always costs less than Wispr Flow. Instead say:
+"With BYOK, light-to-moderate users can often run VoxFlow for less than a typical dictation subscription. Heavy users can choose local mode or set monthly caps."
+
+============================================================
+8. RECOMMENDED MVP COST MODES
+============================================================
+
+Mode 1: Local Only
+Cost: Rs.0/month
+Best for: privacy, offline, Linux users, experimentation
+Downside: latency and accuracy may vary by hardware
+
+Mode 2: BYOK Economy
+Provider: OpenAI gpt-4o-mini-transcribe
+Cost: approx Rs.75-225/month for 10-30 min/day
+Best for: daily use under Rs.400/month
+
+Mode 3: BYOK Hybrid
+Provider: local model first, cloud fallback only when needed
+Cost: approx Rs.50-180/month for many users
+Best for: VoxFlow's default recommended mode
+
+Mode 4: Hosted Pro Later
+VoxFlow manages provider keys and charges subscription
+Cost to user: $5-$8/month target
+Best for: non-technical users
+Do not build this first.
+
+MVP default:
+BYOK Hybrid.
+
+============================================================
+9. FEATURE SET
+============================================================
+
+MVP features:
+- Global push-to-talk hotkey.
+- Toggle dictation mode.
+- Floating bottom bar.
+- Microphone selection.
+- Local VAD.
+- Local transcription option.
+- OpenAI BYOK transcription.
+- Text insertion into active app.
+- Clipboard fallback.
+- Local history.
+- Permission onboarding.
+- Cost dashboard.
+- Usage limits.
+- Model quality modes.
+- Per-app behavior basics.
+
+Version 1 Pro features:
+- AI cleanup.
+- Custom rewrite commands.
+- Prompt library.
+- Per-app profiles.
+- Snippets.
+- Dictionary/custom vocabulary.
+- Developer mode.
+- Terminal-safe output.
+- Markdown mode.
+- Email mode.
+- Slack/Discord casual mode.
+- Meeting notes mode.
+- Export history.
+
+Future features:
+- On-device wake word.
+- Realtime partial transcript.
+- Team dictionary.
+- Sync settings.
+- Mobile companion.
+- Plugin system.
+- Community command packs.
+- Auto language detection.
+- Translation.
+- Voice commands for OS actions.
+
+============================================================
+10. PER-APP INTELLIGENCE
+============================================================
+
+This can become a major differentiator.
+
+Examples:
+
+Cursor / VS Code:
+- Preserve code terms.
+- Do not over-capitalize.
+- Keep variable names literal.
+- Support commands like "write a commit message" or "turn this into a doc comment".
+
+Terminal / Ghostty / Kitty:
+- Plain text only.
+- No smart quotes.
+- No markdown unless requested.
+- Confirm before inserting commands that could execute.
+
+Slack / Discord:
+- Casual tone.
+- Shorter output.
+- Allow emojis optionally.
+
+Gmail / Mail:
+- Professional cleanup.
+- Better punctuation.
+- Optional subject suggestion.
+
+Notion / Obsidian:
+- Markdown-friendly output.
+- Headings, bullets, and todo formatting.
+
+Figma:
+- Concise design feedback.
+- Better for comments and handoff notes.
+
+Browser text fields:
+- Balanced cleanup.
+- Respect selected field content.
+
+============================================================
+11. PLATFORM-NATIVE PLAN
+============================================================
+
+Shared core:
+Use Rust for core audio pipeline, provider routing, hotkey abstraction, settings, encryption, cost tracking, and local history.
+
+UI strategy:
+Use platform-specific UI shells where possible, backed by shared Rust core.
+
+macOS primary:
+Recommended UI: Swift / SwiftUI + AppKit helper layer.
+Core: Rust via FFI or local service.
+Why: best native feel, fastest permission/system integration, best menubar/floating panel support.
+
+macOS permissions likely needed:
+- Microphone: required for recording.
+- Accessibility: likely required for reliable text insertion and active app interaction.
+- Input Monitoring: may be needed depending on global hotkey implementation.
+- Automation: may be needed if controlling other apps via Apple Events.
+- Screen Recording: avoid for MVP unless reading screen context later.
+
+macOS native features:
+- Menu bar app.
+- Floating NSPanel.
+- Rounded bottom pill.
+- Native vibrancy/blur carefully, not too shiny.
+- Launch at login.
+- Permission onboarding checklist.
+- Settings window using SwiftUI.
+- Global hotkeys.
+- Secure keychain for API keys.
+
+Linux COSMIC:
+Recommended UI: Rust + libcosmic.
+Audio: PipeWire.
+Text insertion: Wayland-compatible approaches, with fallbacks.
+Hotkeys: COSMIC/desktop portal support if available; otherwise document setup.
+Storage: Secret Service / keyring for API keys.
+
+Linux challenges:
+- Wayland makes global hotkeys and text injection harder than X11.
+- COSMIC is new and APIs may evolve.
+- Text insertion may need clipboard fallback first.
+
+Linux strategy:
+- Build a great COSMIC-native app first.
+- Use clipboard paste as reliable fallback.
+- Support X11 later if feasible.
+- Be transparent about Wayland limitations.
+
+Windows:
+Recommended UI: WinUI 3 or native Windows App SDK shell.
+Core: Rust shared core.
+Audio: WASAPI.
+Text insertion: UI Automation / SendInput fallback.
+Hotkey: RegisterHotKey.
+Storage: Windows Credential Manager.
+Native features:
+- System tray.
+- Compact floating bar.
+- Startup task.
+- Windows notification for permission/errors.
+
+Cross-platform fallback:
+If native shells slow development too much, use Tauri only for settings/dashboard, but keep the dictation bar as native as possible. Avoid making the main experience feel like a web app.
+
+============================================================
+12. UI AND EXPERIENCE DESIGN
+============================================================
+
+The app should be small, cornered, calm, and premium.
+
+Floating bar:
+- Position: bottom center by default.
+- Alternative: bottom right.
+- Shape: rounded pill.
+- Height: around 44-64 px.
+- Width: dynamic, around 220-420 px.
+- Shows mic icon, waveform, timer, and state.
+- No large transcript by default.
+- Optional mini transcript preview in settings.
+
+Visual style:
+- Native blur only if subtle.
+- Low contrast borders.
+- Smooth but fast animations.
+- No shiny AI gradients in the app itself.
+- Avoid interruptive popups.
+- Use OS accent colors subtly.
+
+Sound/haptics:
+- Optional start/stop sounds.
+- Disabled by default or very subtle.
+- macOS haptic feedback only if available and not annoying.
+
+Settings sections:
+- General
+- Hotkey
+- Microphone
+- Transcription
+- AI Cleanup
+- Providers
+- Cost Control
+- Per-App Profiles
+- Privacy
+- Advanced
+
+============================================================
+13. TEXT INSERTION STRATEGY
+============================================================
+
+Insertion is one of the hardest parts.
+
+Priority order:
+1. Direct text insertion via accessibility/UI automation where safe.
+2. Clipboard paste with clipboard restore.
+3. Copy result and show "Copied" state if paste fails.
+4. Manual paste fallback.
+
+Clipboard restore behavior:
+- Save previous clipboard.
+- Place transcript on clipboard.
+- Simulate paste.
+- Restore previous clipboard after short delay if safe.
+- Provide setting to disable clipboard restore.
+
+Safety:
+- In terminal apps, never auto-press Enter.
+- For command-like text, insert only, do not execute.
+- Allow blocklist apps where VoxFlow should not insert.
+
+============================================================
+14. PROVIDER ROUTING
+============================================================
+
+Provider abstraction:
+- Local Whisper.cpp / faster-whisper
+- OpenAI
+- Deepgram
+- AssemblyAI
+- Groq
+- Gemini
+- OpenRouter where supported
+
+Routing decision inputs:
+- User-selected mode
+- Audio length
+- Noise level
+- Active app
+- Battery status
+- Network status
+- Monthly cost cap
+- Language
+- Required accuracy
+
+Default routing:
+- Under 5 seconds, clean audio: local or mini.
+- 5-60 seconds: gpt-4o-mini-transcribe.
+- Noisy or important: accurate mode.
+- Offline: local.
+- Cost cap reached: local only.
+
+============================================================
+15. COST CONTROL UX
+============================================================
+
+This should be a first-class feature.
+
+Dashboard:
+- Minutes transcribed this month.
+- Estimated API cost.
+- Current provider/model.
+- Average cost per day.
+- Projected monthly cost.
+- Local vs cloud percentage.
+
+Controls:
+- Monthly cloud minute cap.
+- Monthly spend cap.
+- Warn at 50%, 80%, 100%.
+- Auto-switch to local mode after cap.
+- Per-provider caps.
+- Per-app cloud disable.
+
+User-facing copy:
+"VoxFlow can help you stay under your monthly budget by trimming silence, routing simple dictation locally, and switching to local mode when your cap is reached."
+
+============================================================
+16. PRIVACY AND SECURITY
+============================================================
+
+Privacy promises:
+- API keys stored locally in OS keychain/credential manager.
+- Dictation history stored locally.
+- Cloud requests only when user selects a cloud provider or hybrid mode.
+- Local-only mode available.
+- Clear indicator when cloud is used.
+- No analytics in MVP unless opt-in.
+
+Settings:
+- Disable history.
+- Auto-delete history after 1/7/30 days.
+- Never save audio.
+- Save transcripts only.
+- Local-only mode.
+- Redact sensitive apps.
+
+Sensitive app mode:
+For password managers, banking websites, private windows, or user-defined apps:
+- Disable recording automatically.
+- Or require explicit confirmation.
+
+============================================================
+17. MONETIZATION
+============================================================
+
+Yes, VoxFlow can be monetized.
+
+Best model:
+Free + paid lifetime + optional hosted subscription later.
+
+Free:
+- Local transcription.
+- One BYOK provider.
+- Basic hotkey.
+- Basic floating bar.
+- Limited history.
+
+Pro lifetime: $29-$49
+Unlock:
+- Multiple providers.
+- AI cleanup.
+- Per-app profiles.
+- Custom commands.
+- Cost dashboard.
+- Dictionary/custom vocabulary.
+- Snippets.
+- Advanced hotkeys.
+- More local models.
+
+Hosted plan later: $5-$8/month
+For users who do not want to manage API keys.
+Do not build this until demand is proven.
+
+Positioning:
+"Use your own API key, or stay fully local. Pay once for the app, not forever for transcription."
+
+============================================================
+18. TAGS AND KEYWORDS
+============================================================
+
+Website tags:
+- AI dictation
+- voice typing
+- speech to text
+- desktop dictation
+- native dictation app
+- BYOK AI
+- local-first AI
+- Whisper dictation
+- Wispr Flow alternative
+- Linux dictation
+- macOS dictation
+- Windows dictation
+- COSMIC desktop app
+- voice input
+- AI keyboard
+- productivity tool
+- developer productivity
+- system-wide dictation
+
+App Store / SEO keyword ideas:
+- voice typing app
+- AI voice dictation
+- speech to text desktop
+- dictate anywhere
+- voice to text mac
+- Linux voice typing
+- Windows dictation app
+- Whisper desktop app
+- BYOK transcription
+- local transcription
+- AI writing assistant
+
+Social tags:
+- #buildinpublic
+- #indiedev
+- #macapps
+- #linuxdesktop
+- #cosmicdesktop
+- #productivity
+- #AItools
+- #opensource optional only if open-source
+- #voiceai
+- #speechToText
+- #developers
+
+Do not overuse tags. Use 2-5 per post.
+
+============================================================
+19. WEBSITE STRUCTURE FOR voxflow.maskedsyntax.com
+============================================================
+
+Hero:
+Headline:
+Speak anywhere. VoxFlow writes it for you.
+
+Subheadline:
+A fast native voice input layer for macOS, Linux, and Windows. Dictate into any app, clean up your speech with your own AI key, and stay in flow.
+
+CTA:
+Join the waitlist
+
+Secondary CTA:
+See how it works
+
+Hero visual:
+A calm desktop screenshot with a tiny floating VoxFlow bar at the bottom, inserted text in an editor, and no noisy UI.
+
+Sections:
+
+1. Built to stay out of your way
+Small bottom bar, global hotkey, no context switching.
+
+2. Fast enough to trust
+Preloaded audio pipeline, local VAD, hybrid routing, quick insertion.
+
+3. BYOK by default
+Use your own OpenAI key or local Whisper. Control your cost.
+
+4. Linux is first-class
+VoxFlow targets COSMIC Linux instead of ignoring Linux users.
+
+5. Works where you write
+Cursor, VS Code, Slack, Gmail, Notion, Obsidian, browsers, terminals.
+
+6. Per-app intelligence
+Different behavior for code, email, terminal, chat, notes, and docs.
+
+7. Privacy controls
+Local history, keychain storage, local-only mode, no unnecessary cloud.
+
+8. Pricing philosophy
+Pay for the app. Bring your own AI. Hosted plan optional later.
+
+Waitlist form fields:
+- Email
+- Platform: macOS / Linux / Windows
+- Primary use: coding / writing / email / chat / accessibility / other
+- Do you want BYOK? yes/no
+
+Footer:
+A MaskedSyntax project.
+voxflow.maskedsyntax.com
+
+============================================================
+20. BUILD ROADMAP
+============================================================
+
+Phase 0: Prototype for yourself
+- macOS global hotkey.
+- Record audio.
+- Send to OpenAI BYOK.
+- Paste result into active app.
+- Floating bar prototype.
+
+Phase 1: Private MVP
+- VAD.
+- Cost dashboard.
+- Local history.
+- Settings.
+- Clipboard restore.
+- Basic local Whisper.
+- Error handling.
+
+Phase 2: COSMIC Linux build
+- PipeWire capture.
+- libcosmic UI.
+- Hotkey strategy.
+- Clipboard fallback.
+- Local mode.
+- BYOK mode.
+
+Phase 3: Public beta
+- Waitlist invite.
+- Crash reporting if opt-in.
+- Better onboarding.
+- Pricing page.
+- License system.
+
+Phase 4: Windows
+- WASAPI capture.
+- RegisterHotKey.
+- SendInput/UI Automation.
+- Tray app.
+- Windows installer.
+
+Phase 5: Pro release
+- Custom commands.
+- Per-app profiles.
+- Provider marketplace.
+- Lifetime license.
+
+============================================================
+21. TECH STACK RECOMMENDATION
+============================================================
+
+Core:
+- Rust
+- CPAL or platform-native audio abstraction
+- WebRTC VAD / Silero VAD integration
+- Whisper.cpp bindings for local transcription
+- Reqwest for provider APIs
+- SQLite for local history/settings
+- OS keychain libraries for secrets
+
+macOS:
+- SwiftUI + AppKit
+- Rust FFI/local daemon
+- Keychain
+- Accessibility APIs
+- Global hotkeys
+
+Linux COSMIC:
+- Rust
+- libcosmic
+- PipeWire
+- Secret Service/keyring
+- Wayland-compatible clipboard and portal APIs
+
+Windows:
+- Rust core
+- WinUI 3 shell or native Windows App SDK
+- WASAPI
+- RegisterHotKey
+- SendInput/UI Automation
+- Windows Credential Manager
+
+Alternative simpler stack:
+- Tauri settings app + native floating overlay per platform.
+This is faster to build but may feel less native if not carefully designed.
+
+============================================================
+22. RISKS
+============================================================
+
+Biggest risks:
+1. Latency feels worse than Wispr Flow.
+2. Text insertion is unreliable across apps.
+3. Linux Wayland limitations create friction.
+4. Local models are too slow on weak hardware.
+5. BYOK setup scares non-technical users.
+6. Permissions on macOS feel intimidating.
+7. Cloud cost exceeds user expectation.
+
+Mitigations:
+1. Optimize short dictation path first.
+2. Build fallback insertion paths.
+3. Start with COSMIC and clipboard fallback.
+4. Offer cloud mode as default for speed.
+5. Make BYOK onboarding visual and simple.
+6. Build a permission checklist screen.
+7. Add spend caps and projections.
+
+============================================================
+23. MVP SUCCESS CRITERIA
+============================================================
+
+Personal success:
+- You can replace Wispr Flow for 80% of daily use.
+- Your monthly BYOK cost stays under Rs.400.
+- Short dictation feels fast enough to use repeatedly.
+- It works in Cursor, browser, terminal, Slack/Discord, and notes.
+
+Public beta success:
+- 100 waitlist users.
+- 20 active beta users.
+- 5 people say they used it for a full day.
+- At least 3 Linux users give positive feedback.
+- At least 1 paid license sale.
+
+Performance success:
+- Short phrase insertion usually under 1.5 seconds.
+- App does not feel heavy while idle.
+- Recording never misses the first word after warmup.
+- Paste fallback works reliably.
+
+============================================================
+24. FINAL PRODUCT DIRECTION
+============================================================
+
+VoxFlow should not be just a Wispr Flow clone.
+
+It should become:
+A native, BYOK-first AI input layer for the desktop.
+
+The wedge:
+- Cheaper for BYOK users.
+- Linux support.
+- Local-first option.
+- Developer-friendly workflows.
+- Per-app intelligence.
+- Calm, non-interruptive UI.
+
+The make-or-break factor:
+Performance.
+
+If VoxFlow feels instant, native, and reliable, users will forgive a smaller feature set. If it feels slow, no amount of features will save it.
+
+Build the fastest useful version first.

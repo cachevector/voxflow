@@ -1,0 +1,4 @@
+module voxflow_ffiFFI {
+    header "voxflow_ffiFFI.h"
+    export *
+}

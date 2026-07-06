@@ -1,0 +1,10 @@
+[package]
+name = "voxflow-vad"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+webrtc-vad.workspace = true
