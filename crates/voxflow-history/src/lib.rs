@@ -115,7 +115,8 @@ impl HistoryStore {
                 estimated_usd: row.get(8)?,
             })
         })?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(HistoryError::from)
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(HistoryError::from)
     }
 
     pub fn delete_older_than_days(&self, days: u32) -> Result<u64, HistoryError> {
@@ -165,7 +166,12 @@ impl HistoryStore {
         Ok(csv)
     }
 
-    pub fn save_monthly_usage(&self, month: u32, year: i32, json: &str) -> Result<(), HistoryError> {
+    pub fn save_monthly_usage(
+        &self,
+        month: u32,
+        year: i32,
+        json: &str,
+    ) -> Result<(), HistoryError> {
         let conn = self.connect()?;
         conn.execute(
             "DELETE FROM usage_monthly WHERE month = ?1 AND year = ?2",
@@ -178,7 +184,11 @@ impl HistoryStore {
         Ok(())
     }
 
-    pub fn load_monthly_usage(&self, month: u32, year: i32) -> Result<Option<String>, HistoryError> {
+    pub fn load_monthly_usage(
+        &self,
+        month: u32,
+        year: i32,
+    ) -> Result<Option<String>, HistoryError> {
         let conn = self.connect()?;
         let mut stmt = conn.prepare(
             "SELECT data_json FROM usage_monthly WHERE month = ?1 AND year = ?2 LIMIT 1",

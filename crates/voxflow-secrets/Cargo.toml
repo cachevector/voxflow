@@ -1,0 +1,8 @@
+[package]
+name = "voxflow-secrets"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+keyring.workspace = true
+thiserror.workspace = true

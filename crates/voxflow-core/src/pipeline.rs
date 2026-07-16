@@ -6,17 +6,17 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use voxflow_audio::AudioCapture;
-use voxflow_config::{OutputMode, Settings};
+use voxflow_config::{OutputMode, ProviderConfig, ProviderKind, Settings};
 use voxflow_cost::{
     build_dashboard, cap_reached, estimate_openai_cost_usd, MonthlyUsage, UsageRecord,
 };
-use voxflow_history::{HistoryStore, new_entry};
-use voxflow_insert::{InsertionBridge, InsertResult};
-use voxflow_router::{ProviderRouter, RouteTarget};
-use voxflow_transcribe::{
-    apply_dictionary, apply_snippets, AudioSegment, CleanupEngine, LocalWhisperTranscriber,
-    OpenAiTranscriber, TranscribeOpts, TranscriptionProvider,
+use voxflow_history::{new_entry, HistoryStore};
+use voxflow_insert::{InsertResult, InsertionBridge};
+use voxflow_provider::{
+    apply_dictionary, apply_rules, apply_snippets, system_prompt_for_mode, AudioSegment,
+    TranscribeOpts,
 };
+use voxflow_router::{ModelTier, ProviderRouter};
 use voxflow_vad::{VoiceActivityDetector, SAMPLE_RATE};
 
 pub struct DictationResult {
@@ -34,7 +34,6 @@ pub struct DictationPipeline {
     monthly_usage: MonthlyUsage,
     latency: LatencyTracker,
     state: DictationState,
-    offline: bool,
 }
 
 impl DictationPipeline {
@@ -56,16 +55,11 @@ impl DictationPipeline {
             monthly_usage,
             latency: LatencyTracker::new(),
             state: DictationState::Idle,
-            offline: false,
         })
     }
 
     pub fn state(&self) -> DictationState {
         self.state
-    }
-
-    pub fn set_offline(&mut self, offline: bool) {
-        self.offline = offline;
     }
 
     pub async fn prewarm(&mut self) -> Result<()> {
@@ -86,10 +80,7 @@ impl DictationPipeline {
                 Ok(c) => self.capture = Some(c),
                 Err(e) => {
                     self.state = DictationState::Error;
-                    return StateEvent::new(
-                        self.state,
-                        Some(format!("Microphone error: {e}")),
-                    );
+                    return StateEvent::new(self.state, Some(format!("Microphone error: {e}")));
                 }
             }
         }
@@ -109,7 +100,27 @@ impl DictationPipeline {
         self.stop_and_process_inner(active_app_id).await
     }
 
-    #[allow(unused_assignments)]
+    fn error_result(&mut self, message: impl Into<String>) -> (StateEvent, DictationResult) {
+        self.state = DictationState::Error;
+        (
+            StateEvent::new(self.state, Some(message.into())),
+            DictationResult {
+                text: String::new(),
+                state: self.state,
+                insert_result: None,
+                latency_ms: 0,
+            },
+        )
+    }
+
+    async fn resolve_client(config: &ProviderConfig) -> voxflow_provider::OpenAiCompatibleClient {
+        let secret = match &config.api_key_ref {
+            Some(key_ref) => voxflow_secrets::get_secret(key_ref).ok().flatten(),
+            None => None,
+        };
+        voxflow_provider::build_client(config, secret)
+    }
+
     async fn stop_and_process_inner(
         &mut self,
         active_app_id: Option<String>,
@@ -130,17 +141,6 @@ impl DictationPipeline {
         self.latency.mark_vad_done();
 
         let settings = self.settings.read().await.clone();
-        let route = ProviderRouter::decide(
-            &settings,
-            &self.monthly_usage,
-            trim.trimmed_duration_secs,
-            self.offline,
-            active_app_id.as_deref(),
-            false,
-        );
-
-        self.state = DictationState::Transcribing;
-        self.latency.mark_transcribe_start();
 
         let output_mode = active_app_id
             .as_ref()
@@ -153,99 +153,76 @@ impl DictationPipeline {
             })
             .unwrap_or(OutputMode::Balanced);
 
+        let route = ProviderRouter::decide(
+            &settings,
+            &self.monthly_usage,
+            trim.trimmed_duration_secs,
+            active_app_id.as_deref(),
+            false,
+        );
+
+        let decision = match route {
+            Ok(d) => d,
+            Err(e) => return Ok(self.error_result(e.to_string())),
+        };
+
+        self.state = DictationState::Transcribing;
+        self.latency.mark_transcribe_start();
+
+        let model = match decision.tier {
+            ModelTier::Cheap => settings.transcription_provider.model.clone(),
+            ModelTier::Accurate => settings
+                .transcription_provider
+                .accurate_model
+                .clone()
+                .unwrap_or_else(|| settings.transcription_provider.model.clone()),
+        };
+
         let segment = AudioSegment {
             pcm_i16: trim.trimmed.clone(),
             sample_rate: SAMPLE_RATE,
             duration_secs: trim.trimmed_duration_secs,
         };
-
         let opts = TranscribeOpts {
-            model: settings.openai_model.clone(),
+            model: model.clone(),
             language: None,
             prompt: None,
         };
 
-        let mut transcript_text = String::new();
-        let mut provider_id = String::new();
-        let mut model_used = String::new();
-        let mut was_local = false;
-        let mut estimated_usd = 0.0f32;
-
-        match route {
-            Ok(decision) => {
-                model_used = decision.model.clone();
-                match decision.target {
-                    RouteTarget::Local => {
-                        was_local = true;
-                        let local = LocalWhisperTranscriber::new(settings.local_model.clone());
-                        provider_id = local.id().to_string();
-                        match local.transcribe(&segment, &opts).await {
-                            Ok(t) => transcript_text = t.text,
-                            Err(e) => {
-                                if let Some(key) = &settings.openai_api_key {
-                                    let cloud = OpenAiTranscriber::new(key.clone());
-                                    provider_id = cloud.id().to_string();
-                                    was_local = false;
-                                    let t = cloud
-                                        .transcribe(&segment, &opts)
-                                        .await
-                                        .map_err(|ce| anyhow::anyhow!("{e}; cloud fallback: {ce}"))?;
-                                    transcript_text = t.text;
-                                    estimated_usd = estimate_openai_cost_usd(
-                                        &model_used,
-                                        trim.trimmed_duration_secs,
-                                    );
-                                } else {
-                                    return Err(anyhow::anyhow!("{e}"));
-                                }
-                            }
-                        }
-                    }
-                    RouteTarget::OpenAiMini | RouteTarget::OpenAiAccurate => {
-                        let key = settings
-                            .openai_api_key
-                            .clone()
-                            .context("OpenAI API key required")?;
-                        let cloud = OpenAiTranscriber::new(key);
-                        provider_id = cloud.id().to_string();
-                        let mut cloud_opts = opts.clone();
-                        cloud_opts.model = decision.model;
-                        let t = cloud.transcribe(&segment, &cloud_opts).await?;
-                        transcript_text = t.text;
-                        model_used = t.model;
-                        estimated_usd =
-                            estimate_openai_cost_usd(&model_used, trim.trimmed_duration_secs);
-                    }
-                }
-            }
-            Err(e) => {
-                self.state = DictationState::Error;
-                return Ok((
-                    StateEvent::new(self.state, Some(e.to_string())),
-                    DictationResult {
-                        text: String::new(),
-                        state: self.state,
-                        insert_result: None,
-                        latency_ms: 0,
-                    },
-                ));
-            }
-        }
+        let transcription_client = Self::resolve_client(&settings.transcription_provider).await;
+        let transcript = match transcription_client.transcribe(&segment, &opts).await {
+            Ok(t) => t,
+            Err(e) => return Ok(self.error_result(format!("Transcription failed: {e}"))),
+        };
 
         self.latency.mark_transcribe_done();
 
-        transcript_text = CleanupEngine::apply_rules(&transcript_text, output_mode);
-        if settings.is_pro() {
-            transcript_text = apply_snippets(&transcript_text, &settings.snippets);
-            transcript_text = apply_dictionary(&transcript_text, &settings.dictionary);
-        }
+        let is_self_hosted = settings.transcription_provider.kind == ProviderKind::CustomEndpoint;
+        let estimated_usd = if is_self_hosted {
+            0.0
+        } else {
+            estimate_openai_cost_usd(&model, trim.trimmed_duration_secs)
+        };
+        let provider_id = settings.transcription_provider.resolved_base_url();
 
-        if settings.cleanup_enabled && settings.is_pro() {
-            if let Some(key) = &settings.openai_api_key {
-                self.state = DictationState::Cleaning;
-                let cleanup = CleanupEngine::new(key.clone());
-                if let Ok(cleaned) = cleanup.cleanup(&transcript_text, &settings.cleanup_prompt).await {
-                    transcript_text = cleaned;
+        let mut transcript_text = apply_rules(&transcript.text, output_mode);
+        transcript_text = apply_snippets(&transcript_text, &settings.snippets);
+        transcript_text = apply_dictionary(&transcript_text, &settings.dictionary);
+
+        if settings.rewrite_enabled {
+            self.state = DictationState::Cleaning;
+            let rewrite_client = Self::resolve_client(&settings.rewrite_provider).await;
+            let system_prompt = system_prompt_for_mode(output_mode, &settings.rewrite_prompt);
+            if let Ok(rewritten) = rewrite_client
+                .chat_rewrite(
+                    &transcript_text,
+                    &system_prompt,
+                    &settings.rewrite_provider.model,
+                )
+                .await
+            {
+                if !rewritten.trim().is_empty() {
+                    transcript_text = rewritten;
                 }
             }
         }
@@ -282,7 +259,7 @@ impl DictationPipeline {
             let entry = new_entry(
                 transcript_text.clone(),
                 &provider_id,
-                &model_used,
+                &model,
                 trim.raw_duration_secs,
                 trim.trimmed_duration_secs,
                 active_app_id.clone(),
@@ -296,10 +273,10 @@ impl DictationPipeline {
             date: chrono::Local::now().date_naive(),
             duration_raw_secs: trim.raw_duration_secs,
             duration_billable_secs: trim.trimmed_duration_secs,
-            provider: provider_id.clone(),
-            model: model_used.clone(),
+            provider: provider_id,
+            model: model.clone(),
             estimated_usd,
-            was_local,
+            was_self_hosted: is_self_hosted,
         });
 
         let now = chrono::Local::now();
@@ -341,8 +318,8 @@ impl DictationPipeline {
     pub fn cost_dashboard(&self, settings: &Settings) -> voxflow_cost::CostDashboard {
         build_dashboard(
             &self.monthly_usage,
-            "hybrid",
-            &settings.openai_model,
+            &format!("{:?}", settings.transcription_provider.kind),
+            &settings.transcription_provider.model,
             settings.cost_control.monthly_minute_cap,
             settings.cost_control.monthly_spend_cap_usd,
             &settings.cost_control.warn_at_percent,

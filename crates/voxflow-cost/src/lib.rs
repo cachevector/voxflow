@@ -20,7 +20,7 @@ pub struct UsageRecord {
     pub provider: String,
     pub model: String,
     pub estimated_usd: f32,
-    pub was_local: bool,
+    pub was_self_hosted: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -41,23 +41,27 @@ impl MonthlyUsage {
     }
 
     pub fn billable_minutes(&self) -> f32 {
-        self.records.iter().map(|r| r.duration_billable_secs).sum::<f32>() / 60.0
+        self.records
+            .iter()
+            .map(|r| r.duration_billable_secs)
+            .sum::<f32>()
+            / 60.0
     }
 
     pub fn total_usd(&self) -> f32 {
         self.records.iter().map(|r| r.estimated_usd).sum()
     }
 
-    pub fn local_percentage(&self) -> f32 {
+    pub fn self_hosted_percentage(&self) -> f32 {
         if self.records.is_empty() {
             return 100.0;
         }
-        let local = self.records.iter().filter(|r| r.was_local).count() as f32;
-        (local / self.records.len() as f32) * 100.0
+        let self_hosted = self.records.iter().filter(|r| r.was_self_hosted).count() as f32;
+        (self_hosted / self.records.len() as f32) * 100.0
     }
 
     pub fn cloud_percentage(&self) -> f32 {
-        100.0 - self.local_percentage()
+        100.0 - self.self_hosted_percentage()
     }
 
     pub fn add_record(&mut self, record: UsageRecord) {
@@ -97,7 +101,7 @@ pub struct CostDashboard {
     pub average_daily_usd: f32,
     pub projected_monthly_usd: f32,
     pub projected_monthly_inr: f32,
-    pub local_percentage: f32,
+    pub self_hosted_percentage: f32,
     pub cloud_percentage: f32,
     pub cap_warnings: Vec<String>,
 }
@@ -141,9 +145,7 @@ pub fn check_caps(
         for pct in warn_at {
             let threshold = cap * (*pct as f32 / 100.0);
             if spent >= threshold {
-                warnings.push(format!(
-                    "Spend at {pct}% of cap (${spent:.2}/${cap:.2})"
-                ));
+                warnings.push(format!("Spend at {pct}% of cap (${spent:.2}/${cap:.2})"));
             }
         }
     }
@@ -189,7 +191,7 @@ pub fn build_dashboard(
         average_daily_usd: usage.average_daily_usd(),
         projected_monthly_usd: usage.projected_monthly_usd(),
         projected_monthly_inr: usd_to_inr(usage.projected_monthly_usd()),
-        local_percentage: usage.local_percentage(),
+        self_hosted_percentage: usage.self_hosted_percentage(),
         cloud_percentage: usage.cloud_percentage(),
         cap_warnings: check_caps(usage, minute_cap, spend_cap_usd, warn_at),
     }
@@ -215,7 +217,7 @@ mod tests {
             provider: "openai".into(),
             model: "gpt-4o-mini-transcribe".into(),
             estimated_usd: 0.18,
-            was_local: false,
+            was_self_hosted: false,
         });
         assert!(!cap_reached(&usage, Some(100.0), Some(5.0)));
         assert!(cap_reached(&usage, Some(30.0), None));

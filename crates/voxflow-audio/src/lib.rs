@@ -42,9 +42,7 @@ pub struct AudioCapture {
 impl AudioCapture {
     pub fn list_devices() -> Result<Vec<AudioDeviceInfo>> {
         let host = cpal::default_host();
-        let default_name = host
-            .default_input_device()
-            .and_then(|d| d.name().ok());
+        let default_name = host.default_input_device().and_then(|d| d.name().ok());
 
         let devices: Vec<AudioDeviceInfo> = host
             .input_devices()
@@ -53,7 +51,11 @@ impl AudioCapture {
                 let name = d.name().ok()?;
                 let id = name.clone();
                 let is_default = default_name.as_ref() == Some(&name);
-                Some(AudioDeviceInfo { id, name, is_default })
+                Some(AudioDeviceInfo {
+                    id,
+                    name,
+                    is_default,
+                })
             })
             .collect();
         Ok(devices)
@@ -97,7 +99,8 @@ impl AudioCapture {
             }
             loop {
                 match cmd_rx.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok(AudioCommand::Shutdown) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                    Ok(AudioCommand::Shutdown)
+                    | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 }
             }
@@ -174,10 +177,8 @@ fn build_stream(
         SampleFormat::I16 => device.build_input_stream(
             stream_config,
             move |data: &[i16], _| {
-                let converted: Vec<f32> = data
-                    .iter()
-                    .map(|&s| s as f32 / i16::MAX as f32)
-                    .collect();
+                let converted: Vec<f32> =
+                    data.iter().map(|&s| s as f32 / i16::MAX as f32).collect();
                 buffer.lock().extend_from_slice(&converted);
             },
             |err| warn!("audio stream error: {err}"),

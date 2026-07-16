@@ -33,9 +33,7 @@ impl DictationEngine {
     }
 
     pub fn prewarm(&self) -> Result<()> {
-        self.block_on(async {
-            self.pipeline.write().await.prewarm().await
-        })
+        self.block_on(async { self.pipeline.write().await.prewarm().await })
     }
 
     pub fn on_hotkey_down(&self) -> StateEvent {
@@ -69,15 +67,7 @@ impl DictationEngine {
     }
 
     pub fn save_settings(&self, settings: Settings) -> Result<()> {
-        self.block_on(async {
-            self.pipeline.read().await.update_settings(settings).await
-        })
-    }
-
-    pub fn set_offline(&self, offline: bool) {
-        self.block_on(async {
-            self.pipeline.write().await.set_offline(offline);
-        });
+        self.block_on(async { self.pipeline.read().await.update_settings(settings).await })
     }
 
     pub fn cost_dashboard(&self) -> voxflow_cost::CostDashboard {
@@ -86,5 +76,17 @@ impl DictationEngine {
             let settings = p.settings().await;
             p.cost_dashboard(&settings)
         })
+    }
+
+    pub fn list_history(&self, limit: u32) -> Result<Vec<voxflow_history::HistoryEntry>> {
+        self.block_on(async { self.pipeline.read().await.list_history(limit) })
+    }
+
+    pub fn export_history_json(&self, limit: u32) -> Result<String> {
+        self.block_on(async { self.pipeline.read().await.export_history_json(limit) })
+    }
+
+    pub fn export_history_csv(&self, limit: u32) -> Result<String> {
+        self.block_on(async { self.pipeline.read().await.export_history_csv(limit) })
     }
 }

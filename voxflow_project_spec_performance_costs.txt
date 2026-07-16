@@ -1,6 +1,6 @@
 VOXFLOW PROJECT SPEC
-Cross-platform native AI dictation for macOS, Linux COSMIC, and Windows
-Updated: 2026-07-06
+Cross-platform AI dictation for macOS and Windows, built on Rust + Tauri + React
+Updated: 2026-07-16
 
 ============================================================
 0. PRODUCT IDENTITY
@@ -8,23 +8,22 @@ Updated: 2026-07-06
 
 Product name: VoxFlow
 Domain: voxflow.maskedsyntax.com
-Category: Native AI dictation / OS-level writing layer / BYOK voice input
+Category: AI dictation / OS-level writing layer / BYOK voice input
 Primary platform: macOS
-Secondary platform: Linux COSMIC
-Third platform: Windows 11
-Core idea: A small, native-feeling voice bar that appears only when needed, listens instantly, transcribes quickly, cleans up speech, and inserts text into the current app without interrupting the user's flow.
+Secondary platform: Windows 11
+Core idea: A small, native-feeling voice bar that appears only when needed, listens instantly, transcribes quickly, rewrites speech into a polished sentence, and inserts text into the current app without interrupting the user's flow.
 
 One-line positioning:
-VoxFlow is a fast, native, BYOK voice input layer for your desktop.
+VoxFlow is a fast, BYOK voice input layer for your desktop with a built-in AI rewrite pass.
 
 Sharper positioning:
-Speak anywhere. VoxFlow turns your voice into clean text inside the app you are already using.
+Speak anywhere. VoxFlow turns your voice into clean, well-formed text inside the app you are already using.
 
 Developer-focused positioning:
-A native AI keyboard for macOS, Linux, and Windows. Dictate, rewrite, command, and paste across any app.
+An AI keyboard for macOS and Windows, built on Tauri + React. Dictate, rewrite, command, and paste across any app.
 
 Primary business angle:
-Not another AI subscription. VoxFlow is BYOK-first, local-capable, Linux-friendly, and built for people who care about speed, privacy, and control.
+Not another AI subscription. VoxFlow is BYOK-first (including fully self-hosted setups), local-history-first, and built for people who care about speed, privacy, and control over their own cost.
 
 ============================================================
 1. DOMAIN DECISION: voxflow.maskedsyntax.com
@@ -61,7 +60,7 @@ Use the subdomain now. Do not let domain buying slow the product down. The produ
 Wispr Flow is strong because it is fast, polished, and system-wide. If VoxFlow is slow, clunky, ugly, or unreliable, Wispr Flow and similar products will easily push it down.
 
 Current competitive reference points:
-- Wispr Flow supports macOS, Windows, iOS, and Android according to its official device requirements and website. It does not list Linux as a supported desktop platform.
+- Wispr Flow supports macOS, Windows, iOS, and Android according to its official device requirements and website.
 - Wispr Flow pricing is positioned as a subscription product, with public pages showing Pro pricing around $15/month monthly or around $12/month annually.
 - OpenAI gpt-4o-mini-transcribe is listed at $0.003/minute and gpt-4o-transcribe at $0.006/minute on OpenAI pricing pages.
 
@@ -72,7 +71,7 @@ Sources checked on 2026-07-06:
 - https://developers.openai.com/api/docs/pricing
 
 Main opportunity:
-A fast, beautiful, native-feeling, BYOK-first dictation app for macOS + Linux + Windows, with Linux COSMIC treated as a first-class target instead of an afterthought.
+A fast, beautiful, native-feeling, BYOK-first dictation app for macOS + Windows that also supports fully self-hosted providers (e.g. a home server reachable over Tailscale), so cost-conscious and privacy-conscious users are never locked into a subscription or a single cloud vendor.
 
 ============================================================
 3. PRODUCT PHILOSOPHY
@@ -270,13 +269,13 @@ AI rewrite can cost extra tokens. Use it only in selected modes.
 Show estimated monthly cost based on minutes used.
 
 7. Provider choice
-Support OpenAI first, then optionally Groq, Deepgram, AssemblyAI, Gemini, OpenRouter, and local Whisper.
+Support any OpenAI-API-compatible endpoint through one generic adapter: OpenAI and Groq out of the box, plus a "Custom Endpoint" option (base URL + optional key) that works identically for a self-hosted server. A user running whisper.cpp-server/faster-whisper-server and llama.cpp-server/Ollama on their own hardware (e.g. a Raspberry Pi reachable over Tailscale) can point both the transcription call and the rewrite call at it and drive marginal API cost to roughly $0 — the only cost is the hardware and electricity they already own.
 
 8. Quality modes
-- Economy: local + gpt-4o-mini only.
-- Balanced: gpt-4o-mini + cleanup.
-- Accurate: gpt-4o-transcribe.
-- Offline: local only.
+- Economy: cheapest configured model (mini-tier) only.
+- Balanced: mini-tier transcription + AI rewrite pass.
+- Accurate: highest-accuracy configured model.
+- Custom Endpoint: self-hosted server (e.g. Raspberry Pi over Tailscale) — near-zero marginal cost, latency depends on the hardware.
 
 9. Max session cap
 Optional setting: stop recording after 60/120/300 seconds to prevent accidental cost.
@@ -292,10 +291,10 @@ VoxFlow should not promise that BYOK always costs less than Wispr Flow. Instead 
 8. RECOMMENDED MVP COST MODES
 ============================================================
 
-Mode 1: Local Only
-Cost: Rs.0/month
-Best for: privacy, offline, Linux users, experimentation
-Downside: latency and accuracy may vary by hardware
+Mode 1: Custom Endpoint (Self-Hosted)
+Cost: ~Rs.0/month marginal (hardware/electricity you already own)
+Best for: privacy, a home server (e.g. Raspberry Pi over Tailscale) running an OpenAI-compatible transcription/rewrite server, experimentation
+Downside: latency and accuracy depend entirely on the hardware you host it on
 
 Mode 2: BYOK Economy
 Provider: OpenAI gpt-4o-mini-transcribe
@@ -303,7 +302,7 @@ Cost: approx Rs.75-225/month for 10-30 min/day
 Best for: daily use under Rs.400/month
 
 Mode 3: BYOK Hybrid
-Provider: local model first, cloud fallback only when needed
+Provider: cheap/mini model first, higher-accuracy model only when the router decides it's needed (long/noisy audio)
 Cost: approx Rs.50-180/month for many users
 Best for: VoxFlow's default recommended mode
 
@@ -314,7 +313,7 @@ Best for: non-technical users
 Do not build this first.
 
 MVP default:
-BYOK Hybrid.
+BYOK Hybrid, with Custom Endpoint available as a first-class alternative from day one (not a later add-on).
 
 ============================================================
 9. FEATURE SET
@@ -323,11 +322,11 @@ BYOK Hybrid.
 MVP features:
 - Global push-to-talk hotkey.
 - Toggle dictation mode.
-- Floating bottom bar.
+- Floating bottom bar with live waveform.
 - Microphone selection.
 - Local VAD.
-- Local transcription option.
-- OpenAI BYOK transcription.
+- BYOK cloud transcription (OpenAI/Groq) or a self-hosted Custom Endpoint.
+- AI rewrite pass on by default (not Pro-gated) — every transcript gets cleaned up into a polished sentence before insertion, using an independently configurable provider/endpoint.
 - Text insertion into active app.
 - Clipboard fallback.
 - Local history.
@@ -337,8 +336,9 @@ MVP features:
 - Model quality modes.
 - Per-app behavior basics.
 
+Note: embedded/in-process local Whisper inference (running a model directly inside the app with no network call) is explicitly out of scope for MVP — it is a fast-follow. "Local"/offline-feeling usage in the MVP means pointing the Custom Endpoint at a self-hosted server, not an in-process model.
+
 Version 1 Pro features:
-- AI cleanup.
 - Custom rewrite commands.
 - Prompt library.
 - Per-app profiles.
@@ -411,67 +411,47 @@ Browser text fields:
 ============================================================
 
 Shared core:
-Use Rust for core audio pipeline, provider routing, hotkey abstraction, settings, encryption, cost tracking, and local history.
+Use Rust for the core audio pipeline, provider routing, hotkey abstraction, settings, secret storage, cost tracking, and local history — unchanged in spirit from the original plan.
 
 UI strategy:
-Use platform-specific UI shells where possible, backed by shared Rust core.
+One shell for both platforms: Tauri v2 (Rust host) + React (TypeScript) frontend, for BOTH the settings/configuration window and the floating waveform bar. This is the primary plan, not a fallback — a single web-based UI layer kept small, fast, and carefully styled can match native feel closely enough when the hot path (hotkey capture, audio, state transitions) stays in Rust and only rendering lives in React. Two Tauri windows: a normal decorated settings window, and a small transparent/always-on-top/undecorated overlay window for the pill bar, shown/hidden imperatively from Rust so it can appear well within the latency budget without waiting on a JS round-trip.
 
-macOS primary:
-Recommended UI: Swift / SwiftUI + AppKit helper layer.
-Core: Rust via FFI or local service.
-Why: best native feel, fastest permission/system integration, best menubar/floating panel support.
+macOS:
+Shell: Tauri v2 window + React, packaged as a standard .app/.dmg via Tauri's bundler.
+Core: Rust, linked directly into the Tauri binary (no FFI layer needed — Tauri commands/events replace what UniFFI-to-Swift would have done).
 
 macOS permissions likely needed:
 - Microphone: required for recording.
-- Accessibility: likely required for reliable text insertion and active app interaction.
-- Input Monitoring: may be needed depending on global hotkey implementation.
+- Accessibility: required for reliable direct text insertion (AXUIElement API) and active app interaction.
+- Input Monitoring: only needed if the hotkey implementation uses a raw CGEventTap (true for a bare-modifier-only binding like Left Control alone). A modifier+key combo hotkey avoids this requirement via tauri-plugin-global-shortcut; keep bare-modifier as an advanced opt-in.
 - Automation: may be needed if controlling other apps via Apple Events.
 - Screen Recording: avoid for MVP unless reading screen context later.
 
-macOS native features:
-- Menu bar app.
-- Floating NSPanel.
-- Rounded bottom pill.
-- Native vibrancy/blur carefully, not too shiny.
-- Launch at login.
-- Permission onboarding checklist.
-- Settings window using SwiftUI.
-- Global hotkeys.
-- Secure keychain for API keys.
-
-Linux COSMIC:
-Recommended UI: Rust + libcosmic.
-Audio: PipeWire.
-Text insertion: Wayland-compatible approaches, with fallbacks.
-Hotkeys: COSMIC/desktop portal support if available; otherwise document setup.
-Storage: Secret Service / keyring for API keys.
-
-Linux challenges:
-- Wayland makes global hotkeys and text injection harder than X11.
-- COSMIC is new and APIs may evolve.
-- Text insertion may need clipboard fallback first.
-
-Linux strategy:
-- Build a great COSMIC-native app first.
-- Use clipboard paste as reliable fallback.
-- Support X11 later if feasible.
-- Be transparent about Wayland limitations.
+macOS native-feeling features (delivered via Tauri, not native Swift):
+- Menu bar / tray icon (Tauri tray API).
+- Floating overlay window styled as a rounded pill (transparent, undecorated, always-on-top).
+- Subtle blur/vibrancy via CSS backdrop-filter, kept restrained per the visual style rules below.
+- Launch at login (tauri-plugin-autostart).
+- Permission onboarding checklist (React view + Rust permission-check commands).
+- Settings window in React.
+- Global hotkeys (tauri-plugin-global-shortcut, with a custom CGEventTap module for bare-modifier mode).
+- Secure Keychain storage for API keys via the `keyring` crate (Rust), not plaintext JSON.
 
 Windows:
-Recommended UI: WinUI 3 or native Windows App SDK shell.
-Core: Rust shared core.
-Audio: WASAPI.
-Text insertion: UI Automation / SendInput fallback.
-Hotkey: RegisterHotKey.
-Storage: Windows Credential Manager.
-Native features:
-- System tray.
-- Compact floating bar.
-- Startup task.
-- Windows notification for permission/errors.
+Shell: the same Tauri v2 window + React, packaged as .msi/NSIS via Tauri's bundler.
+Core: Rust, same binary/crate structure as macOS — no separate WinUI3 shell.
+Audio: WASAPI (via CPAL, unchanged).
+Text insertion: UI Automation first, clipboard + SendInput(Ctrl+V) fallback — treated as the primary reliable path on Windows day one since UIA tree coverage varies by target app.
+Hotkey: tauri-plugin-global-shortcut (wraps RegisterHotKey-equivalent registration), with a raw low-level keyboard hook (SetWindowsHookExW) as the advanced bare-modifier option, mirroring the macOS CGEventTap path.
+Storage: Windows Credential Manager via the same `keyring` crate used on macOS.
+Native-feeling features:
+- System tray icon + menu.
+- Compact floating overlay window (same component as macOS, styled consistently).
+- Startup task (tauri-plugin-autostart).
+- Windows toast notification for permission/errors (tauri-plugin-notification).
 
-Cross-platform fallback:
-If native shells slow development too much, use Tauri only for settings/dashboard, but keep the dictation bar as native as possible. Avoid making the main experience feel like a web app.
+Distribution note (both platforms):
+Even with a web-based UI layer, shipped binaries still need OS-level trust: macOS needs a Developer ID signature + notarization to avoid Gatekeeper blocking the app, and Windows needs an Authenticode signature to avoid SmartScreen friction. Unsigned dev builds are fine for personal use during development; budget for these before any wider distribution.
 
 ============================================================
 12. UI AND EXPERIENCE DESIGN
@@ -668,10 +648,9 @@ Website tags:
 - local-first AI
 - Whisper dictation
 - Wispr Flow alternative
-- Linux dictation
 - macOS dictation
 - Windows dictation
-- COSMIC desktop app
+- self-hosted AI dictation
 - voice input
 - AI keyboard
 - productivity tool
@@ -684,7 +663,6 @@ App Store / SEO keyword ideas:
 - speech to text desktop
 - dictate anywhere
 - voice to text mac
-- Linux voice typing
 - Windows dictation app
 - Whisper desktop app
 - BYOK transcription
@@ -695,8 +673,7 @@ Social tags:
 - #buildinpublic
 - #indiedev
 - #macapps
-- #linuxdesktop
-- #cosmicdesktop
+- #windowsapps
 - #productivity
 - #AItools
 - #opensource optional only if open-source
@@ -715,7 +692,7 @@ Headline:
 Speak anywhere. VoxFlow writes it for you.
 
 Subheadline:
-A fast native voice input layer for macOS, Linux, and Windows. Dictate into any app, clean up your speech with your own AI key, and stay in flow.
+A fast voice input layer for macOS and Windows. Dictate into any app, let a built-in AI rewrite pass clean up your speech, use your own key (cloud or self-hosted), and stay in flow.
 
 CTA:
 Join the waitlist
@@ -735,10 +712,10 @@ Small bottom bar, global hotkey, no context switching.
 Preloaded audio pipeline, local VAD, hybrid routing, quick insertion.
 
 3. BYOK by default
-Use your own OpenAI key or local Whisper. Control your cost.
+Use your own OpenAI/Groq key, or point VoxFlow at a fully self-hosted server you run yourself. Control your cost.
 
-4. Linux is first-class
-VoxFlow targets COSMIC Linux instead of ignoring Linux users.
+4. Built-in AI rewrite
+Every transcript gets a second AI pass that turns rough speech into a clean, well-formed sentence — on by default, not a paid add-on.
 
 5. Works where you write
 Cursor, VS Code, Slack, Gmail, Notion, Obsidian, browsers, terminals.
@@ -747,14 +724,14 @@ Cursor, VS Code, Slack, Gmail, Notion, Obsidian, browsers, terminals.
 Different behavior for code, email, terminal, chat, notes, and docs.
 
 7. Privacy controls
-Local history, keychain storage, local-only mode, no unnecessary cloud.
+Local history, OS keychain/credential-manager storage for keys, self-hosted mode, no unnecessary cloud.
 
 8. Pricing philosophy
 Pay for the app. Bring your own AI. Hosted plan optional later.
 
 Waitlist form fields:
 - Email
-- Platform: macOS / Linux / Windows
+- Platform: macOS / Windows
 - Primary use: coding / writing / email / chat / accessibility / other
 - Do you want BYOK? yes/no
 
@@ -766,49 +743,36 @@ voxflow.maskedsyntax.com
 20. BUILD ROADMAP
 ============================================================
 
-Phase 0: Prototype for yourself
-- macOS global hotkey.
-- Record audio.
-- Send to OpenAI BYOK.
-- Paste result into active app.
-- Floating bar prototype.
+Phase 0: Prototype (macOS + Windows from day one)
+- Tauri scaffold (settings window + empty overlay window) building and running on both platforms.
+- Keyring-based secret storage verified on both OSes.
+- Generic OpenAI-compatible client, tested against real OpenAI for transcription only.
+- Global hotkey (combo-based) -> record -> transcribe -> clipboard-paste insertion (simplest fallback path) -> done.
+- Floating pill shows/hides with a static state label, no waveform yet.
 
 Phase 1: Private MVP
-- VAD.
-- Cost dashboard.
-- Local history.
-- Settings.
-- Clipboard restore.
-- Basic local Whisper.
-- Error handling.
+- VAD silence trimming.
+- AI rewrite pass added as the default second call, independently configurable provider/endpoint.
+- Custom Endpoint provider validated end-to-end against a real self-hosted server (e.g. a Raspberry Pi over Tailscale).
+- Cost dashboard, caps, and 50/80/100% warnings.
+- Local history + privacy settings.
+- Real platform text insertion (Accessibility on macOS, UI Automation on Windows) with clipboard fallback.
+- Permission onboarding checklist.
+- Live waveform visualization in the overlay.
+- Error handling for empty audio, network failure, provider auth failure.
 
-Phase 2: COSMIC Linux build
-- PipeWire capture.
-- libcosmic UI.
-- Hotkey strategy.
-- Clipboard fallback.
-- Local mode.
-- BYOK mode.
+Phase 2: Public-facing polish
+- Per-app intelligence profiles for named apps (Cursor/VS Code, Terminal, Slack, Gmail, Notion/Obsidian).
+- Snippets + dictionary.
+- Better onboarding, crash reporting/analytics opt-in (off by default).
+- Code signing (macOS notarization, Windows Authenticode) once ready to distribute beyond personal use.
 
-Phase 3: Public beta
-- Waitlist invite.
-- Crash reporting if opt-in.
-- Better onboarding.
-- Pricing page.
-- License system.
+Phase 3: "V1 Pro" feature set
+- Custom rewrite commands.
+- Saved provider presets (OpenAI / Groq / "My Raspberry Pi") so a self-hosted URL doesn't need re-entry.
+- Expanded per-app coverage, dev-mode/terminal-safe refinements, markdown/email/slack output-mode tuning.
 
-Phase 4: Windows
-- WASAPI capture.
-- RegisterHotKey.
-- SendInput/UI Automation.
-- Tray app.
-- Windows installer.
-
-Phase 5: Pro release
-- Custom commands.
-- Per-app profiles.
-- Provider marketplace.
-- Lifetime license.
+No phase targets Linux, embedded local Whisper inference, or a hosted multi-tenant backend.
 
 ============================================================
 21. TECH STACK RECOMMENDATION
@@ -816,60 +780,42 @@ Phase 5: Pro release
 
 Core:
 - Rust
-- CPAL or platform-native audio abstraction
-- WebRTC VAD / Silero VAD integration
-- Whisper.cpp bindings for local transcription
-- Reqwest for provider APIs
-- SQLite for local history/settings
-- OS keychain libraries for secrets
+- CPAL for cross-platform audio capture (WASAPI on Windows, CoreAudio on macOS)
+- WebRTC VAD for silence trimming
+- A single generic OpenAI-API-compatible HTTP adapter (reqwest) covering OpenAI, Groq, and any self-hosted server (whisper.cpp-server/llama.cpp-server/Ollama) via configurable base URL — used for both transcription and the AI rewrite pass
+- SQLite for local history
+- The `keyring` crate for OS-native secret storage (macOS Keychain, Windows Credential Manager)
 
-macOS:
-- SwiftUI + AppKit
-- Rust FFI/local daemon
-- Keychain
-- Accessibility APIs
-- Global hotkeys
+Shell (both platforms):
+- Tauri v2 + React + TypeScript, one codebase for the settings window and the floating overlay window
+- tauri-plugin-global-shortcut for hotkeys, tauri-plugin-autostart, tauri-plugin-positioner, tauri-plugin-clipboard-manager, tauri-plugin-notification
+- macOS: Accessibility APIs (AXUIElement) for direct text insertion, CGEventTap for advanced bare-modifier hotkeys
+- Windows: UI Automation for direct text insertion, SendInput/clipboard for the primary reliable insertion path, low-level keyboard hook for advanced bare-modifier hotkeys
 
-Linux COSMIC:
-- Rust
-- libcosmic
-- PipeWire
-- Secret Service/keyring
-- Wayland-compatible clipboard and portal APIs
-
-Windows:
-- Rust core
-- WinUI 3 shell or native Windows App SDK
-- WASAPI
-- RegisterHotKey
-- SendInput/UI Automation
-- Windows Credential Manager
-
-Alternative simpler stack:
-- Tauri settings app + native floating overlay per platform.
-This is faster to build but may feel less native if not carefully designed.
+Fast-follow (not MVP):
+- Embedded/in-process local Whisper inference (whisper.cpp/whisper-rs bindings running a model directly inside the app). MVP covers "local-feeling" usage through the Custom Endpoint provider pointed at a self-hosted server instead.
 
 ============================================================
 22. RISKS
 ============================================================
 
 Biggest risks:
-1. Latency feels worse than Wispr Flow.
+1. Latency feels worse than Wispr Flow, especially with a web-based UI layer.
 2. Text insertion is unreliable across apps.
-3. Linux Wayland limitations create friction.
-4. Local models are too slow on weak hardware.
-5. BYOK setup scares non-technical users.
-6. Permissions on macOS feel intimidating.
-7. Cloud cost exceeds user expectation.
+3. A self-hosted Custom Endpoint (e.g. a Raspberry Pi) is too slow or unreachable while traveling.
+4. BYOK setup scares non-technical users.
+5. Permissions on macOS feel intimidating.
+6. Cloud cost exceeds user expectation.
+7. Unsigned builds trigger Gatekeeper/SmartScreen friction during personal/beta use.
 
 Mitigations:
-1. Optimize short dictation path first.
+1. Keep the hot path (hotkey, audio, state machine) in Rust; React only renders. Optimize short dictation path first.
 2. Build fallback insertion paths.
-3. Start with COSMIC and clipboard fallback.
-4. Offer cloud mode as default for speed.
-5. Make BYOK onboarding visual and simple.
-6. Build a permission checklist screen.
-7. Add spend caps and projections.
+3. Default to a cloud provider, with Custom Endpoint as an explicit opt-in that falls back gracefully on failure.
+4. Make BYOK onboarding visual and simple.
+5. Build a permission checklist screen.
+6. Add spend caps and projections.
+7. Document the "click More info -> Run anyway" workaround until certs are budgeted for.
 
 ============================================================
 23. MVP SUCCESS CRITERIA
@@ -885,7 +831,6 @@ Public beta success:
 - 100 waitlist users.
 - 20 active beta users.
 - 5 people say they used it for a full day.
-- At least 3 Linux users give positive feedback.
 - At least 1 paid license sale.
 
 Performance success:
@@ -901,12 +846,12 @@ Performance success:
 VoxFlow should not be just a Wispr Flow clone.
 
 It should become:
-A native, BYOK-first AI input layer for the desktop.
+A BYOK-first AI input layer for the desktop, with a built-in rewrite pass and a real self-hosted option.
 
 The wedge:
-- Cheaper for BYOK users.
-- Linux support.
-- Local-first option.
+- Cheaper for BYOK users, and near-free for self-hosted users.
+- Every transcript gets rewritten into a clean sentence by default.
+- Works with a fully self-hosted provider (e.g. a home server over Tailscale), not just cloud vendors.
 - Developer-friendly workflows.
 - Per-app intelligence.
 - Calm, non-interruptive UI.

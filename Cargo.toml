@@ -4,16 +4,16 @@ members = [
     "crates/voxflow-core",
     "crates/voxflow-audio",
     "crates/voxflow-vad",
-    "crates/voxflow-transcribe",
+    "crates/voxflow-provider",
     "crates/voxflow-router",
     "crates/voxflow-insert",
     "crates/voxflow-history",
     "crates/voxflow-cost",
     "crates/voxflow-config",
-    "crates/voxflow-ffi",
-    "apps/linux-cosmic",
+    "crates/voxflow-secrets",
+    "src-tauri",
 ]
-default-members = ["crates/voxflow-ffi"]
+default-members = ["src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
@@ -23,13 +23,16 @@ authors = ["MaskedSyntax"]
 
 [workspace.dependencies]
 anyhow = "1"
+arboard = "3"
 async-trait = "0.1"
 base64 = "0.22"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 cpal = "0.15"
 directories = "5"
+enigo = "0.2"
 hound = "3"
+keyring = "3"
 parking_lot = "0.12"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
@@ -39,7 +42,6 @@ thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uniffi = { version = "0.28", features = ["cli"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 webrtc-vad = "0.4"
 
@@ -49,8 +51,9 @@ voxflow-core = { path = "crates/voxflow-core" }
 voxflow-cost = { path = "crates/voxflow-cost" }
 voxflow-history = { path = "crates/voxflow-history" }
 voxflow-insert = { path = "crates/voxflow-insert" }
+voxflow-provider = { path = "crates/voxflow-provider" }
 voxflow-router = { path = "crates/voxflow-router" }
-voxflow-transcribe = { path = "crates/voxflow-transcribe" }
+voxflow-secrets = { path = "crates/voxflow-secrets" }
 voxflow-vad = { path = "crates/voxflow-vad" }
 
 [profile.release]

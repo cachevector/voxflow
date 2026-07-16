@@ -3,7 +3,8 @@ target/
 .DS_Store
 *.dylib
 *.a
-apps/macos/.build/
-apps/macos/dist/
 .env
 *.db
+node_modules/
+dist/
+src-tauri/gen/

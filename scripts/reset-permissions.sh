@@ -12,7 +12,7 @@ tccutil reset Microphone "$BUNDLE_ID" 2>/dev/null || true
 
 echo ""
 echo "Done. Now:"
-echo "  1. open apps/macos/dist/VoxFlow.app"
+echo "  1. pnpm tauri dev   (or open the built .app)"
 echo "  2. System Settings → Privacy & Security"
-echo "  3. Enable VoxFlow in Input Monitoring, Accessibility, and Microphone"
-echo "  4. Menu bar → VoxFlow → Reconnect Hotkey"
+echo "  3. Enable VoxFlow in Accessibility and Microphone"
+echo "     (Input Monitoring only needed if you use the advanced bare-modifier hotkey)"

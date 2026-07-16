@@ -1,0 +1,16 @@
+[package]
+name = "voxflow-provider"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+hound = "3"
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+voxflow-config.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

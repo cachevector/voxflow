@@ -20,7 +20,6 @@ pub enum QualityMode {
     Economy,
     Balanced,
     Accurate,
-    Offline,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -48,12 +47,78 @@ impl Default for HotkeyConfig {
     }
 }
 
+/// Which kind of OpenAI-API-compatible endpoint a `ProviderConfig` targets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderKind {
+    #[default]
+    OpenAi,
+    Groq,
+    CustomEndpoint,
+}
+
+impl ProviderKind {
+    /// Default base URL for known cloud providers. `CustomEndpoint` has no
+    /// default — the user must supply one.
+    pub fn default_base_url(self) -> Option<&'static str> {
+        match self {
+            ProviderKind::OpenAi => Some("https://api.openai.com/v1"),
+            ProviderKind::Groq => Some("https://api.groq.com/openai/v1"),
+            ProviderKind::CustomEndpoint => None,
+        }
+    }
+}
+
+/// Config for a single OpenAI-compatible call target (transcription or rewrite).
+/// The actual secret lives in the OS keychain, looked up by `api_key_ref` via
+/// `voxflow-secrets` — never stored here in plaintext.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderConfig {
+    pub kind: ProviderKind,
+    /// Required for `CustomEndpoint`; overrides the default for known providers if set.
+    pub base_url: Option<String>,
+    pub model: String,
+    /// Optional higher-accuracy model used when the router picks the accurate tier.
+    pub accurate_model: Option<String>,
+    /// Keyring lookup key (e.g. "transcription", "rewrite"), not the secret itself.
+    pub api_key_ref: Option<String>,
+}
+
+impl ProviderConfig {
+    pub fn resolved_base_url(&self) -> String {
+        self.base_url
+            .clone()
+            .or_else(|| self.kind.default_base_url().map(str::to_string))
+            .unwrap_or_default()
+    }
+
+    pub fn default_transcription() -> Self {
+        Self {
+            kind: ProviderKind::OpenAi,
+            base_url: None,
+            model: "gpt-4o-mini-transcribe".into(),
+            accurate_model: Some("gpt-4o-transcribe".into()),
+            api_key_ref: Some("transcription".into()),
+        }
+    }
+
+    pub fn default_rewrite() -> Self {
+        Self {
+            kind: ProviderKind::OpenAi,
+            base_url: None,
+            model: "gpt-4o-mini".into(),
+            accurate_model: None,
+            api_key_ref: Some("rewrite".into()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CostControlConfig {
     pub monthly_minute_cap: Option<f32>,
     pub monthly_spend_cap_usd: Option<f32>,
     pub warn_at_percent: Vec<u8>,
-    pub auto_local_after_cap: bool,
+    pub auto_downgrade_after_cap: bool,
 }
 
 impl Default for CostControlConfig {
@@ -62,7 +127,7 @@ impl Default for CostControlConfig {
             monthly_minute_cap: None,
             monthly_spend_cap_usd: Some(5.0),
             warn_at_percent: vec![50, 80, 100],
-            auto_local_after_cap: true,
+            auto_downgrade_after_cap: true,
         }
     }
 }
@@ -155,9 +220,11 @@ pub struct Settings {
     pub dictation_mode: DictationMode,
     pub hotkey: HotkeyConfig,
     pub microphone_device: Option<String>,
-    pub openai_api_key: Option<String>,
-    pub openai_model: String,
-    pub local_model: String,
+    pub transcription_provider: ProviderConfig,
+    pub rewrite_provider: ProviderConfig,
+    /// AI rewrite pass runs on every transcript by default (not Pro-gated).
+    pub rewrite_enabled: bool,
+    pub rewrite_prompt: String,
     pub session_cap_seconds: u32,
     pub clipboard_restore: bool,
     pub launch_at_login: bool,
@@ -167,13 +234,10 @@ pub struct Settings {
     pub crash_reporting_opt_in: bool,
     pub analytics_opt_in: bool,
     pub onboarding_complete: bool,
-    pub beta_invite_code: Option<String>,
     pub license: LicenseInfo,
     pub app_profiles: Vec<AppProfile>,
     pub snippets: Vec<Snippet>,
     pub dictionary: Vec<DictionaryEntry>,
-    pub cleanup_enabled: bool,
-    pub cleanup_prompt: String,
     pub rewrite_commands: Vec<RewriteCommand>,
     pub history_limit_free: u32,
 }
@@ -196,14 +260,15 @@ pub enum BarPosition {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: 2,
             quality_mode: QualityMode::Hybrid,
             dictation_mode: DictationMode::PushToTalk,
             hotkey: HotkeyConfig::default(),
             microphone_device: None,
-            openai_api_key: None,
-            openai_model: "gpt-4o-mini-transcribe".into(),
-            local_model: "tiny".into(),
+            transcription_provider: ProviderConfig::default_transcription(),
+            rewrite_provider: ProviderConfig::default_rewrite(),
+            rewrite_enabled: true,
+            rewrite_prompt: "Rewrite this dictated speech into a clean, well-formed sentence. Fix grammar, punctuation, and filler words. Keep the original meaning and tone.".into(),
             session_cap_seconds: 120,
             clipboard_restore: true,
             launch_at_login: false,
@@ -213,13 +278,10 @@ impl Default for Settings {
             crash_reporting_opt_in: false,
             analytics_opt_in: false,
             onboarding_complete: false,
-            beta_invite_code: None,
             license: LicenseInfo::default(),
             app_profiles: default_app_profiles(),
             snippets: Vec::new(),
             dictionary: Vec::new(),
-            cleanup_enabled: false,
-            cleanup_prompt: "Fix punctuation and capitalization only. Keep meaning.".into(),
             rewrite_commands: Vec::new(),
             history_limit_free: 50,
         }
@@ -256,12 +318,8 @@ fn default_app_profiles() -> Vec<AppProfile> {
 }
 
 impl Settings {
-    pub fn is_pro(&self) -> bool {
-        matches!(self.license.tier, LicenseTier::Pro | LicenseTier::Beta)
-    }
-
     pub fn max_history_entries(&self) -> u32 {
-        if self.is_pro() {
+        if matches!(self.license.tier, LicenseTier::Pro | LicenseTier::Beta) {
             u32::MAX
         } else {
             self.history_limit_free
@@ -273,18 +331,6 @@ pub fn config_dir() -> Option<PathBuf> {
     ProjectDirs::from("com", "maskedsyntax", "VoxFlow").map(|d| d.config_dir().to_path_buf())
 }
 
-/// Path used by early scripts/docs before `directories` canonical layout.
-pub fn legacy_config_dir() -> Option<PathBuf> {
-    directories::BaseDirs::new().map(|d| {
-        d.home_dir()
-            .join("Library/Application Support/maskedsyntax/VoxFlow")
-    })
-}
-
-pub fn legacy_settings_path() -> Option<PathBuf> {
-    legacy_config_dir().map(|d| d.join("settings.json"))
-}
-
 pub fn data_dir() -> Option<PathBuf> {
     ProjectDirs::from("com", "maskedsyntax", "VoxFlow").map(|d| d.data_dir().to_path_buf())
 }
@@ -293,54 +339,31 @@ pub fn settings_path() -> Option<PathBuf> {
     config_dir().map(|d| d.join("settings.json"))
 }
 
+/// Reads the legacy plaintext key (if a pre-v2 settings.json is still on disk)
+/// so callers can migrate it into the keychain before the first save overwrites it.
+pub fn legacy_plaintext_openai_key() -> Option<String> {
+    let path = settings_path()?;
+    let data = fs::read_to_string(path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&data).ok()?;
+    value
+        .get("openai_api_key")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .map(str::to_string)
+}
+
 pub fn load_settings() -> Result<Settings, ConfigError> {
     let Some(path) = settings_path() else {
         return Ok(Settings::default());
     };
 
-    let legacy = legacy_settings_path().filter(|p| p.exists() && *p != path);
-    let legacy_settings = legacy
-        .as_ref()
-        .and_then(|p| fs::read_to_string(p).ok())
-        .and_then(|data| serde_json::from_str::<Settings>(&data).ok());
-
     if !path.exists() {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        if let Some(legacy_path) = &legacy {
-            fs::copy(legacy_path, &path)?;
-        } else {
-            return Ok(Settings::default());
-        }
+        return Ok(Settings::default());
     }
 
     let data = fs::read_to_string(&path)?;
-    let mut settings: Settings = serde_json::from_str(&data)?;
-
-    if let Some(legacy_settings) = legacy_settings {
-        merge_legacy_settings(&mut settings, &legacy_settings);
-        save_settings(&settings)?;
-    }
-
+    let settings: Settings = serde_json::from_str(&data)?;
     Ok(settings)
-}
-
-/// Prefer user-edited values from the legacy init-settings.sh path.
-fn merge_legacy_settings(current: &mut Settings, legacy: &Settings) {
-    if legacy
-        .openai_api_key
-        .as_ref()
-        .is_some_and(|k| !k.trim().is_empty())
-    {
-        current.openai_api_key = legacy.openai_api_key.clone();
-    }
-    if legacy.hotkey != current.hotkey {
-        current.hotkey = legacy.hotkey.clone();
-    }
-    if legacy.onboarding_complete {
-        current.onboarding_complete = true;
-    }
 }
 
 pub fn save_settings(settings: &Settings) -> Result<(), ConfigError> {
@@ -363,6 +386,16 @@ mod tests {
     fn default_settings_hybrid_mode() {
         let s = Settings::default();
         assert_eq!(s.quality_mode, QualityMode::Hybrid);
-        assert!(!s.is_pro());
+        assert!(s.rewrite_enabled);
+        assert_eq!(s.max_history_entries(), 50);
+    }
+
+    #[test]
+    fn custom_endpoint_has_no_default_base_url() {
+        assert_eq!(ProviderKind::CustomEndpoint.default_base_url(), None);
+        let mut cfg = ProviderConfig::default_transcription();
+        cfg.kind = ProviderKind::CustomEndpoint;
+        cfg.base_url = Some("http://raspberrypi.local:8080/v1".into());
+        assert_eq!(cfg.resolved_base_url(), "http://raspberrypi.local:8080/v1");
     }
 }

@@ -2,6 +2,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+mod clipboard_paste;
+pub use clipboard_paste::ClipboardPasteInserter;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InsertMethod {
@@ -29,7 +32,11 @@ pub enum InsertError {
 
 #[async_trait]
 pub trait TextInserter: Send + Sync {
-    async fn insert(&self, text: &str, restore_clipboard: bool) -> Result<InsertResult, InsertError>;
+    async fn insert(
+        &self,
+        text: &str,
+        restore_clipboard: bool,
+    ) -> Result<InsertResult, InsertError>;
     async fn copy_only(&self, text: &str) -> Result<(), InsertError>;
 }
 
@@ -43,7 +50,11 @@ impl InsertionBridge {
         Self { inner }
     }
 
-    pub async fn insert(&self, text: &str, restore_clipboard: bool) -> Result<InsertResult, InsertError> {
+    pub async fn insert(
+        &self,
+        text: &str,
+        restore_clipboard: bool,
+    ) -> Result<InsertResult, InsertError> {
         if text.trim().is_empty() {
             return Err(InsertError::EmptyText);
         }
@@ -70,7 +81,11 @@ impl Default for StubInserter {
 
 #[async_trait]
 impl TextInserter for StubInserter {
-    async fn insert(&self, text: &str, _restore_clipboard: bool) -> Result<InsertResult, InsertError> {
+    async fn insert(
+        &self,
+        text: &str,
+        _restore_clipboard: bool,
+    ) -> Result<InsertResult, InsertError> {
         *self.last_text.lock() = Some(text.to_string());
         Ok(InsertResult {
             success: true,

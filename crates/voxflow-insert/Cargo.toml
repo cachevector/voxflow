@@ -5,7 +5,10 @@ edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+arboard.workspace = true
 async-trait.workspace = true
+enigo.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
