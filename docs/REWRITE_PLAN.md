@@ -2,6 +2,8 @@
 
 > This is the architecture/planning document produced before the rewrite began. It's kept here (rather than only in a local planning tool) so the project is fully self-contained and can be picked up from any machine.
 
+> **Pending change, not yet executed:** the plan below still targets Windows + macOS. There's an approved-but-unexecuted plan to drop Windows and target Linux (Wayland-first, X11 secondary) instead — see `docs/LINUX_MIGRATION_PLAN.md`. Do that swap before starting any new Windows-specific work.
+
 ## Status (as of 2026-07-16)
 
 **Phase 0 is complete and verified working.** What exists right now:

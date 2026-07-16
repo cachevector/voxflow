@@ -38,6 +38,7 @@ docs/
 ## Docs
 
 - [Rewrite plan & current status](docs/REWRITE_PLAN.md) — start here to see what's done and what's next
+- [Linux migration plan](docs/LINUX_MIGRATION_PLAN.md) — approved, not yet executed: swaps Windows for Linux (Wayland-first, X11 secondary)
 - [Architecture](docs/architecture.md)
 - [macOS setup](docs/macos-setup.md)
 - [Windows setup](docs/windows-setup.md)
