@@ -7,12 +7,8 @@ use voxflow_platform::{GlobalHotkeyBackend, HotkeyBinding, ManualBindingHotkey};
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let backend = ManualBindingHotkey::new();
-    futures_lite::future::block_on(backend.register(HotkeyBinding {
-        key_code: 0,
-        modifiers: 0,
-        label: "manual".into(),
-    }))
-    .map_err(|e| anyhow::anyhow!(e))?;
+    futures_lite::future::block_on(backend.register(HotkeyBinding::default_binding()))
+        .map_err(|e| anyhow::anyhow!(e))?;
 
     println!(
         "listening on {} — run `voxflowctl trigger toggle` in another terminal",

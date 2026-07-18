@@ -1,11 +1,25 @@
 use gpui::{div, prelude::*, rgba, white, Context, Render, Window};
+use voxflow_core::{StateEvent, UiState};
 
-/// Phase 0 spike placeholder: just enough visual content (a rounded,
-/// semi-opaque pill with a label) to confirm the overlay window itself
-/// renders, positions, and stacks correctly. The real waveform/state-label
-/// rendering lands in Phase 2.
 pub struct OverlayView {
-    pub label: String,
+    pub event: StateEvent,
+}
+
+impl OverlayView {
+    fn label(&self) -> &'static str {
+        // Calm, non-technical labels only — the spec explicitly rules out
+        // anything implying network/API mechanics ("Uploading", "Waiting
+        // for API", "Processing request").
+        match self.event.ui_state {
+            UiState::Idle => "",
+            UiState::Listening => "Listening",
+            UiState::Cleaning => "Cleaning",
+            UiState::Inserting => "Inserting",
+            UiState::Copied => "Copied — press Ctrl+V",
+            UiState::Done => "Done",
+            UiState::Error => "Something went wrong",
+        }
+    }
 }
 
 impl Render for OverlayView {
@@ -19,6 +33,6 @@ impl Render for OverlayView {
             .bg(rgba(0x1a1a1aee))
             .text_color(white())
             .text_size(gpui::rems(1.0))
-            .child(self.label.clone())
+            .child(self.label())
     }
 }

@@ -14,7 +14,18 @@ anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 voxflow-core.workspace = true
+voxflow-config.workspace = true
+voxflow-insert.workspace = true
 voxflow-platform.workspace = true
+async-channel = "2"
+futures-lite = "2"
+ksni = "0.2"
+# Pinned to a `git` rev (not crates.io) on purpose: GPUI is pre-1.0 with
+# routine breaking changes, and the wlr-layer-shell support the overlay
+# needs (zed-industries/zed#35610, merged 2025-10-29) postdates the last
+# crates.io publish (gpui 0.2.2, 2025-10-22). This rev is tagged v1.11.3 —
+# a stable release, not an arbitrary main commit. Re-vet deliberately on
+# any bump; don't auto-update. See docs/phase0-spike-notes.md.
 gpui = { git = "https://github.com/zed-industries/zed", rev = "952d712dac48a4af2c54fb22c82d82a9d69b72d4" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "952d712dac48a4af2c54fb22c82d82a9d69b72d4", features = ["font-kit", "wayland", "x11"] }
 gpui_tokio = { git = "https://github.com/zed-industries/zed", rev = "952d712dac48a4af2c54fb22c82d82a9d69b72d4" }

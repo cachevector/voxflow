@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 mod clipboard_paste;
+mod copy_only;
 pub use clipboard_paste::ClipboardPasteInserter;
+pub use copy_only::CopyOnlyInserter;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

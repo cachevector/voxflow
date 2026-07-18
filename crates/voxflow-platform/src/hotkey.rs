@@ -1,14 +1,34 @@
 use async_trait::async_trait;
 use thiserror::Error;
 
+// Re-exported so callers can build a `HotkeyBinding` without depending on
+// `global-hotkey` directly. `ManualBindingHotkey` ignores the binding's
+// contents entirely (the actual key combo lives in the user's compositor
+// config), but `X11Hotkey`/`MacHotkey` need real modifier/code values.
+pub use global_hotkey::hotkey::{Code, Modifiers};
+
 /// A global push-to-talk (or toggle) key binding, independent of how the
 /// concrete backend actually grabs it (XGrabKey, a portal, or a manual
 /// compositor-bound trigger over a socket).
 #[derive(Debug, Clone)]
 pub struct HotkeyBinding {
-    pub key_code: u16,
-    pub modifiers: u32,
+    pub modifiers: Modifiers,
+    pub code: Code,
     pub label: String,
+}
+
+impl HotkeyBinding {
+    /// VoxFlow's documented default: Super+Shift+Space. Chosen (in the
+    /// original Tauri implementation) specifically as a modifier+key combo
+    /// rather than a bare modifier, so no Input Monitoring permission is
+    /// needed on macOS for the common case.
+    pub fn default_binding() -> Self {
+        Self {
+            modifiers: Modifiers::SUPER | Modifiers::SHIFT,
+            code: Code::Space,
+            label: "Super+Shift+Space".into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

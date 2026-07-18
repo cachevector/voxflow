@@ -8,6 +8,7 @@ authors.workspace = true
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+parking_lot.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 async-channel = "2"
@@ -15,9 +16,11 @@ async-channel = "2"
 [target.'cfg(target_os = "linux")'.dependencies]
 global-hotkey = "0.6"
 ashpd = { version = "0.10", default-features = false, features = ["tokio"] }
+crossbeam-channel = "0.5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 global-hotkey = "0.6"
+crossbeam-channel = "0.5"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
