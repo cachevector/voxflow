@@ -1,0 +1,361 @@
+================================================================================
+PROJECT SPEC: "Murmur" (working name) — Self-hosted Voice Dictation + AI Cleanup
+A Wispr Flow alternative for Fedora/Kubuntu (KDE) + macOS 26.5
+================================================================================
+Author context: solo dev, comfortable with Rust + Tauri 2 + Svelte, also fine
+with C++. Goal: replace a Rs.400/month SaaS with a tool that costs pennies,
+runs fast, and is fully under your control.
+
+--------------------------------------------------------------------------------
+1. WHAT WISPR FLOW ACTUALLY DOES (so we know what we're rebuilding)
+--------------------------------------------------------------------------------
+- Global hotkey (hold or toggle) → floating pill/waveform widget appears near
+  cursor or screen bottom.
+- Mic captures audio while widget shows live waveform (pure UX candy, not
+  functionally necessary).
+- On release/second press: audio → STT → raw transcript.
+- Raw transcript → small LLM pass that fixes filler words, punctuation,
+  capitalization, and light rephrasing, tuned by a "tone/context" profile.
+- Cleaned text is injected at the cursor position in whatever app has focus
+  (via clipboard+paste, not raw keystroke typing — this is what makes it
+  work identically across every app).
+- Settings app holds: mic selection, hotkey, "personal dictionary" (names/
+  jargon it should stop mangling), tone presets, language.
+
+We are rebuilding exactly this loop, minus the venture-funded infra, using
+Groq for both models (STT + text cleanup) with a local whisper.cpp fallback.
+
+--------------------------------------------------------------------------------
+2. TECH STACK DECISION
+--------------------------------------------------------------------------------
+RECOMMENDATION: Rust + Tauri 2 (not raw C++, not Electron).
+
+Why not C++:
+  - You'd hand-roll cross-platform GUI, audio capture, HTTP/TLS, JSON, secure
+    keychain storage, and packaging. All of this is a solved problem in Rust
+    crates. C++ buys you nothing here except more footguns — this app is I/O
+    and glue, not a performance-critical inner loop (the actual heavy lifting,
+    Whisper inference, is already a C++ library either way — see below).
+
+Why Tauri 2 over plain Rust+winit or egui:
+  - You already know Tauri + Svelte — reuse existing muscle memory for the
+    Settings/Profile window.
+  - The floating waveform overlay needs: transparent background, always-on-
+    top, click-through-when-idle, rounded corners, smooth CSS animation for
+    the waveform. This is trivial in HTML/CSS/Canvas, painful in egui/raw
+    Win32-style code.
+  - Tauri's Rust backend still gives you native performance for audio capture,
+    hotkeys, whisper.cpp bindings, and process-level control — the "web" part
+    is only the two small UI surfaces (overlay + settings), not the engine.
+
+Where raw C++ intrudes anyway:
+  - whisper.cpp itself is a C/C++ library. We don't rewrite it — we call it
+    via the `whisper-rs` crate (safe Rust bindings, links against
+    libwhisper.so/whisper.a, supports Metal on macOS and CUDA/Vulkan/CPU on
+    Linux). This gives you native inference speed with zero C++ maintenance
+    on your side.
+
+Core crates:
+  - tauri = "2"                       — app shell, windows, IPC
+  - cpal                              — cross-platform audio capture (mic)
+  - whisper-rs                        — local STT via whisper.cpp bindings
+  - reqwest (rustls-tls)              — Groq API calls
+  - keyring                           — OS-native secret storage (macOS
+                                         Keychain / KDE Wallet or Secret
+                                         Service on Linux) for API keys —
+                                         NEVER store the key in plaintext json
+  - global-hotkey (or tauri-plugin-global-shortcut which wraps it) — X11 +
+                                         macOS global hotkeys
+  - ashpd                             — XDG Desktop Portal bindings (Rust) —
+                                         used ONLY on native Wayland sessions
+                                         for GlobalShortcuts + RemoteDesktop
+                                         portals (see Section 4)
+  - webrtc-vad or a small Silero-VAD onnx model — voice activity detection to
+                                         auto-trim silence before it ever
+                                         reaches Whisper (cuts cost + latency)
+  - arboard                           — clipboard read/write
+  - serde/serde_json                  — config + API payloads
+  - tokio                             — async runtime for API calls
+
+--------------------------------------------------------------------------------
+3. HIGH-LEVEL ARCHITECTURE
+--------------------------------------------------------------------------------
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Background daemon (Tauri app, no dock/taskbar icon, tray icon)  │
+  │                                                                   │
+  │  ┌───────────────┐   ┌───────────────┐   ┌───────────────────┐  │
+  │  │ Hotkey Listener│──▶│ Audio Capture │──▶│  VAD (trim silence)│  │
+  │  │ (portal/native)│   │   (cpal)      │   │                    │  │
+  │  └───────────────┘   └───────────────┘   └─────────┬──────────┘  │
+  │                                                     │             │
+  │                                                     ▼             │
+  │                                        ┌────────────────────────┐│
+  │                                        │   STT Router            ││
+  │                                        │  - Groq Whisper Turbo   ││
+  │                                        │    (default, cloud)     ││
+  │                                        │  - whisper.cpp local    ││
+  │                                        │    (offline/free mode)  ││
+  │                                        └───────────┬────────────┘│
+  │                                                     │ raw text    │
+  │                                                     ▼             │
+  │                                        ┌────────────────────────┐│
+  │                                        │  LLM Cleanup Pass       ││
+  │                                        │  Groq llama-3.1-8b-     ││
+  │                                        │  instant (or similar)   ││
+  │                                        │  + user profile/prompt  ││
+  │                                        └───────────┬────────────┘│
+  │                                                     │ clean text  │
+  │                                                     ▼             │
+  │                                        ┌────────────────────────┐│
+  │                                        │  Injector                ││
+  │                                        │  clipboard + synthetic  ││
+  │                                        │  paste keystroke        ││
+  │                                        └────────────────────────┘│
+  │                                                                   │
+  │  ┌───────────────────────────┐   ┌────────────────────────────┐ │
+  │  │ Floating Overlay Window    │   │ Settings/Profile Window     │ │
+  │  │ (transparent, always-on-   │   │ (Svelte) — API keys, mic,   │ │
+  │  │ top, waveform canvas)      │   │ hotkey, dictionary, tone,   │ │
+  │  │                            │   │ local vs cloud toggle       │ │
+  │  └───────────────────────────┘   └────────────────────────────┘ │
+  └─────────────────────────────────────────────────────────────────┘
+
+Two Tauri windows total: (1) the overlay — frameless, transparent,
+`alwaysOnTop`, `skipTaskbar`, sized ~360x80px, shown/hidden not
+created/destroyed each time (keep it warm to avoid animation jank); (2) the
+settings window — normal window, opened from tray icon, closed most of the
+time (don't keep this one resident, save memory).
+
+--------------------------------------------------------------------------------
+4. THE HARD PART: GLOBAL HOTKEYS ON YOUR SPECIFIC PLATFORMS
+--------------------------------------------------------------------------------
+This is the part that kills most indie clones, so it gets its own section.
+
+MACOS 26.5:
+  - Use Carbon's RegisterEventHotKey (via the `global-hotkey` crate) — still
+    the correct, working API for this in 2026.
+  - Requires Accessibility permission (System Settings → Privacy & Security
+    → Accessibility) — app must prompt and guide the user there on first run.
+    Without it, hotkeys silently no-op.
+  - Push-to-talk (hold Fn or a custom combo) is smoother than toggle for a
+    dictation tool — recommend supporting both, default to toggle since
+    hold-based capture is fiddly with Rust event loops across window focus
+    changes.
+
+FEDORA / KUBUNTU — KDE PLASMA, X11 SESSION:
+  - Trivial. `global-hotkey` crate uses standard X11 global key grabs. Works
+    exactly like on Windows/macOS. No portal needed.
+
+FEDORA / KUBUNTU — KDE PLASMA, WAYLAND SESSION (this is your likely default
+on modern Fedora/Kubuntu):
+  - X11 key-grab APIs do NOT work under native Wayland — no app is allowed to
+    silently steal a global key.
+  - GOOD NEWS specific to your setup: KDE Plasma's Wayland session ships a
+    working implementation of the `org.freedesktop.portal.GlobalShortcuts`
+    D-Bus portal. When your app registers a shortcut through the portal, KDE
+    pops its own native "confirm/change this shortcut" dialog, then the
+    shortcut persists across restarts and shows up in System Settings →
+    Shortcuts. This is the *correct*, future-proof way to do it and it
+    actually works well on KDE (unlike GNOME/wlroots, where this portal is
+    either unimplemented or neutered).
+  - Implementation: use the `ashpd` crate's GlobalShortcuts portal bindings
+    instead of `global-hotkey` when we detect a Wayland session
+    (`$XDG_SESSION_TYPE == wayland` and `$XDG_CURRENT_DESKTOP` contains KDE).
+  - So: TWO hotkey backends behind one trait — `HotkeyBackend` — chosen at
+    runtime:
+      - `X11GrabBackend`   (Linux X11, via global-hotkey)
+      - `PortalBackend`    (Linux Wayland, via ashpd GlobalShortcuts)
+      - `CarbonBackend`    (macOS, via global-hotkey)
+
+TEXT INJECTION (getting the cleaned text INTO the focused app):
+  - macOS: write to NSPasteboard (via `arboard`), then synthesize Cmd+V via
+    CGEvent. Reliable, works everywhere, matches how every dictation tool on
+    macOS does it (including Wispr Flow).
+  - Linux X11: write to clipboard (`arboard`), synthesize Ctrl+V via
+    `xdotool key ctrl+v` (shell out) or the `x11rb` XTEST extension directly.
+  - Linux Wayland (KDE): synthetic input has the same portal restriction as
+    hotkeys. Two options, in priority order:
+      1. `org.freedesktop.portal.RemoteDesktop` portal — request permission
+         once, then send synthetic key events through the compositor
+         legitimately. This is the "proper" Wayland-native way and should be
+         the primary path.
+      2. Fallback: `ydotool` (talks to `/dev/uinput` via a small root-owned
+         `ydotoold` daemon) if the user installs it — works everywhere
+         regardless of compositor portal support, but needs one-time setup
+         (add user to `input` group or run the daemon with appropriate udev
+         rule). Ship this as the documented fallback, not the default.
+  - Always paste-based injection, never simulated raw typing char-by-char —
+    it's the only approach that behaves identically in a browser textbox, a
+    terminal, Slack, and a native KDE app.
+
+RISK FLAG: validate the RemoteDesktop portal path with a small throwaway spike
+BEFORE committing to the full app — this is the single riskiest technical
+unknown in the whole project. Budget 1-2 days for this spike in Phase 1.
+
+--------------------------------------------------------------------------------
+5. STT STRATEGY — CLOUD (GROQ) VS LOCAL (WHISPER.CPP)
+--------------------------------------------------------------------------------
+Default: Groq Whisper Large-v3-Turbo (cloud)
+  - $0.04/hour of audio transcribed, ~228x real-time on Groq's LPU hardware —
+    meaning a 5-second utterance comes back in well under 100ms of pure
+    inference time (network round-trip will dominate latency, not inference).
+  - WER ~10.3%, good enough for dictation once the LLM cleanup pass runs.
+  - Minimum billing is 10 seconds per request — so for typical short dictation
+    bursts (5-15s), pad your accounting to 10s/request when estimating cost,
+    not the literal audio length.
+
+Offline/free fallback: whisper.cpp local, via whisper-rs
+  - Run the `small` or `small.en` ggml model (about 500MB) on CPU — good
+    accuracy/speed tradeoff on a modern laptop, no GPU required, gives usable
+    latency (roughly real-time or faster on Apple Silicon; on x86 CPU-only
+    Fedora box expect 1-3x real-time depending on core count — still fine for
+    short dictation clips).
+  - On macOS, whisper.cpp has Metal acceleration — near-instant for short
+    clips on Apple Silicon.
+  - Use this mode when: no API key configured, offline, or user explicitly
+    picks "local/free" in settings for privacy.
+  - This is your true $0/month path — ship it as a first-class mode, not an
+    afterthought, since it's your actual cost floor.
+
+VAD (Voice Activity Detection) — do this regardless of STT backend:
+  - Run a lightweight VAD (webrtc-vad, or a tiny Silero ONNX model) on the
+    captured buffer BEFORE sending anything to Whisper (local or cloud).
+  - Trims leading/trailing silence and drops near-silent takes entirely
+    (e.g. accidental hotkey press with no speech) — directly cuts Groq cost
+    (since billing is time-based) and cuts local inference time.
+
+--------------------------------------------------------------------------------
+6. LLM CLEANUP PASS
+--------------------------------------------------------------------------------
+Model: Groq `llama-3.1-8b-instant` (cheapest, fastest tier — ~$0.05 input /
+$0.08 output per million tokens, 800+ tokens/sec). A dictation cleanup prompt
+is maybe 100-300 tokens round trip — this is effectively free at personal-use
+volume (see cost model below). Use `llama-3.3-70b` only as an optional
+"higher quality" toggle in settings for users who want better rephrasing and
+don't mind ~10x the (still tiny) cost.
+
+Prompt design:
+  - System prompt encodes: the user's "tone profile" (e.g. casual/Slack vs
+    formal/email), a personal dictionary (proper nouns/jargon it should
+    preserve verbatim — e.g. "CacheVector", "Glowe", "Wispr Flow" itself),
+    and strict instructions: fix filler words/false starts, add punctuation
+    and capitalization, do NOT invent content, do NOT change meaning, return
+    ONLY the corrected text with no preamble/quotes.
+  - Keep this a single non-streaming completion call — for utterances this
+    short, streaming buys you nothing and adds complexity.
+
+Local-only mode caveat: if the user is in fully offline/local mode, skip the
+LLM pass entirely (or optionally run a tiny local model via llama.cpp for
+punctuation-only cleanup) — document this tradeoff clearly in settings so
+they know offline mode = rawer transcripts.
+
+--------------------------------------------------------------------------------
+7. COST MODEL — WHY THIS BEATS Rs.400/MONTH
+--------------------------------------------------------------------------------
+Assume a genuinely heavy personal-use day: 30 minutes of total dictation
+audio/day, ~150 separate dictation bursts/day (short commands + longer notes).
+
+STT (Groq Whisper Turbo, $0.04/hr):
+  30 min/day × 30 days = 900 min = 15 hours/month
+  15 × $0.04 = $0.60/month
+
+LLM cleanup (Groq llama-3.1-8b-instant, $0.05 in / $0.08 out per 1M tokens):
+  150 bursts/day × 30 days = 4,500 calls/month
+  ~150 tokens in + 100 tokens out per call (generous) = 1.125M total tokens
+  cost ≈ (0.675M × $0.05 + 0.45M × $0.08) / 1 ≈ $0.03 + $0.036 ≈ $0.07/month
+
+TOTAL: ≈ $0.67/month ≈ Rs 56/month worst-case, heavy personal use.
+
+And realistically: Groq's FREE tier (2,000 STT requests/day, generous LLM
+rate limits with no credit card) likely covers single-user personal dictation
+entirely — meaning your actual monthly cost may be $0. Even a conservative
+"assume you blow through free tier constantly" estimate lands you at roughly
+1/6th to 1/50th of Rs.400/month.
+
+The local whisper.cpp path is $0/month forever, at the cost of your own CPU
+cycles and (on non-Apple-Silicon Linux) somewhat worse latency.
+
+--------------------------------------------------------------------------------
+8. PERFORMANCE NOTES (keeping perceived latency low)
+--------------------------------------------------------------------------------
+- The overlay window should be created ONCE at app launch and hidden
+  (opacity/visibility toggled), never recreated per use — window creation is
+  the single biggest source of janky "pop-in" delay in Tauri apps.
+- Start streaming mic audio into a ring buffer the instant the hotkey fires;
+  don't wait for any async setup — the waveform should animate within one
+  frame of the keypress.
+- Kick off the Groq STT request as soon as VAD detects trailing silence
+  (i.e., don't wait for explicit hotkey release if using toggle mode with a
+  silence-based auto-stop) — shaves real latency off the perceived pipeline.
+- Keep the whisper.cpp model resident in memory (load once at app startup,
+  not per-request) if local mode is enabled — model load time (100s of ms to
+  seconds) is far worse than inference time itself for short clips.
+- Use `reqwest` with a persistent client (connection pooling / keep-alive) so
+  you're not paying TLS handshake cost on every single dictation burst.
+- Debounce/guard against double-firing the hotkey while a request is already
+  in flight.
+
+--------------------------------------------------------------------------------
+9. SECURITY / PRIVACY
+--------------------------------------------------------------------------------
+- API keys: stored via OS keychain only (`keyring` crate → macOS Keychain /
+  KDE Wallet or Secret Service on Linux). Never write raw keys to a JSON
+  config file on disk.
+- Audio buffers: kept in memory only, never written to disk, zeroed/dropped
+  immediately after the STT request completes (or after local inference).
+- Clear settings toggle: "Local-only mode" that disables all network calls
+  entirely — useful for sensitive dictation (passwords, personal stuff) and
+  doubles as your free-forever mode.
+- No telemetry, no phone-home, no update-check-that-leaks-usage-patterns
+  beyond what you explicitly want.
+
+--------------------------------------------------------------------------------
+10. SUGGESTED BUILD PHASES
+--------------------------------------------------------------------------------
+Phase 0 — Spikes (validate the risky unknowns, ~2-4 days):
+  - KDE Wayland GlobalShortcuts portal round-trip (register → fire → confirm
+    dialog behaves as expected).
+  - RemoteDesktop portal synthetic paste keystroke on KDE Wayland — THIS IS
+    THE RISKIEST ITEM, spike it first.
+  - whisper-rs basic local transcription of a test WAV file, both platforms.
+  - Groq Whisper Turbo API call round-trip + latency measurement.
+
+Phase 1 — Core pipeline, no UI polish:
+  - cpal mic capture → VAD → Groq STT → Groq LLM cleanup → clipboard paste,
+    triggered by a hardcoded hotkey, one platform first (pick whichever OS
+    you're on more often day-to-day).
+  - Get the full loop working end-to-end with ugly/no UI.
+
+Phase 2 — Overlay + Settings UI:
+  - Tauri transparent overlay window with animated waveform (Canvas, driven
+    by live audio amplitude from cpal).
+  - Settings window: API key entry (→ keyring), mic picker, hotkey rebind UI,
+    tone profile, personal dictionary, local-vs-cloud toggle.
+
+Phase 3 — Second platform + hardening:
+  - Port hotkey/injection backend to the other OS.
+  - Local whisper.cpp fallback mode fully wired up.
+  - Error states: no internet, invalid API key, mic permission denied, no
+    speech detected, portal permission denied.
+
+Phase 4 — Packaging:
+  - macOS: signed .app / notarization (or skip notarization for personal use
+    and just allow it manually — Gatekeeper right-click-open).
+  - Linux: AppImage or a Fedora/Kubuntu-friendly package; document the
+    `ydotool` fallback setup steps if the portal path doesn't pan out.
+
+--------------------------------------------------------------------------------
+11. OPEN QUESTIONS TO RESOLVE DURING PHASE 0
+--------------------------------------------------------------------------------
+- Push-to-talk (hold key) vs toggle (press once, VAD auto-stops) — recommend
+  building toggle-with-VAD first since it's far simpler to implement
+  correctly across the portal-based Wayland path, add hold-to-talk later if
+  wanted.
+- Does the RemoteDesktop portal need a fresh permission grant every session,
+  or can it be remembered (KDE typically remembers per-app portal grants) —
+  confirm during the Phase 0 spike since it affects whether every dictation
+  needs a permission dialog (unusable) or just the very first one (fine).
+- Single shared hotkey app-wide vs per-app profiles — start with one global
+  hotkey, defer per-app tone profiles to a v2 feature.
+================================================================================
