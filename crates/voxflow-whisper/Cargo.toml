@@ -1,0 +1,25 @@
+[package]
+name = "voxflow-whisper"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+parking_lot.workspace = true
+reqwest = { workspace = true, features = ["stream"] }
+serde.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["fs"] }
+tracing.workspace = true
+voxflow-config.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.13", features = ["metal"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = { version = "0.13" }
+
+[dev-dependencies]
+hound.workspace = true

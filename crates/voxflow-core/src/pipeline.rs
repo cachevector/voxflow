@@ -6,18 +6,15 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use voxflow_audio::AudioCapture;
-use voxflow_config::{OutputMode, ProviderConfig, ProviderKind, Settings};
-use voxflow_cost::{
-    build_dashboard, cap_reached, estimate_openai_cost_usd, MonthlyUsage, UsageRecord,
-};
+use voxflow_config::{OutputMode, ProviderConfig, Settings};
+use voxflow_cost::{build_dashboard, cap_reached, MonthlyUsage, UsageRecord};
 use voxflow_history::{new_entry, HistoryStore};
 use voxflow_insert::{InsertResult, InsertionBridge};
 use voxflow_provider::{
-    apply_dictionary, apply_rules, apply_snippets, system_prompt_for_mode, AudioSegment,
-    TranscribeOpts,
+    apply_dictionary, apply_rules, apply_snippets, system_prompt_for_mode,
 };
-use voxflow_router::{ModelTier, ProviderRouter};
 use voxflow_vad::{VoiceActivityDetector, SAMPLE_RATE};
+use voxflow_whisper::WhisperEngine;
 
 pub struct DictationResult {
     pub text: String,
@@ -30,6 +27,7 @@ pub struct DictationPipeline {
     settings: Arc<RwLock<Settings>>,
     capture: Option<AudioCapture>,
     inserter: Arc<InsertionBridge>,
+    whisper: Arc<WhisperEngine>,
     history: HistoryStore,
     monthly_usage: MonthlyUsage,
     latency: LatencyTracker,
@@ -37,7 +35,11 @@ pub struct DictationPipeline {
 }
 
 impl DictationPipeline {
-    pub fn new(settings: Settings, inserter: Arc<InsertionBridge>) -> Result<Self> {
+    pub fn new(
+        settings: Settings,
+        inserter: Arc<InsertionBridge>,
+        whisper: Arc<WhisperEngine>,
+    ) -> Result<Self> {
         let history = HistoryStore::open().context("open history")?;
         let mut monthly_usage = MonthlyUsage::current();
         let now = chrono::Local::now();
@@ -51,6 +53,7 @@ impl DictationPipeline {
             settings: Arc::new(RwLock::new(settings)),
             capture: None,
             inserter,
+            whisper,
             history,
             monthly_usage,
             latency: LatencyTracker::new(),
@@ -63,12 +66,18 @@ impl DictationPipeline {
     }
 
     pub async fn prewarm(&mut self) -> Result<()> {
-        let device = self.settings.read().await.microphone_device.clone();
+        let settings = self.settings.read().await.clone();
+        let device = settings.microphone_device.clone();
         let capture = AudioCapture::prewarm(device.as_deref()).context("prewarm audio")?;
         self.capture = Some(capture);
+        if settings.whisper.prewarm_on_launch {
+            self.whisper
+                .prewarm()
+                .await
+                .context("prewarm whisper model")?;
+        }
         Ok(())
     }
-
     pub async fn start_listening(&mut self) -> StateEvent {
         self.latency.reset();
         self.latency.mark_hotkey_down();
@@ -134,11 +143,28 @@ impl DictationPipeline {
             .map(|c| c.take_utterance_pcm_i16())
             .unwrap_or_default();
 
+        // Whisper returns "[BLANK_AUDIO]" for anything at room-noise level, which
+        // is indistinguishable from a pipeline fault without the captured level.
+        let capture_peak = pcm_i16
+            .iter()
+            .fold(0i16, |m, &s| m.max(s.saturating_abs()))
+            as f32
+            / i16::MAX as f32;
+        info!(
+            samples = pcm_i16.len(),
+            peak = capture_peak,
+            "captured utterance"
+        );
+
         let mut vad = VoiceActivityDetector::default_detector();
         let trim = vad
             .trim_silence(&pcm_i16)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
         self.latency.mark_vad_done();
+        info!(
+            trimmed_samples = trim.trimmed.len(),
+            "vad trim complete"
+        );
 
         let settings = self.settings.read().await.clone();
 
@@ -153,59 +179,36 @@ impl DictationPipeline {
             })
             .unwrap_or(OutputMode::Balanced);
 
-        let route = ProviderRouter::decide(
-            &settings,
-            &self.monthly_usage,
-            trim.trimmed_duration_secs,
-            active_app_id.as_deref(),
-            false,
-        );
-
-        let decision = match route {
-            Ok(d) => d,
-            Err(e) => return Ok(self.error_result(e.to_string())),
-        };
+        if trim.trimmed.is_empty() {
+            return Ok(self.error_result("No speech detected — try speaking closer to the mic"));
+        }
 
         self.state = DictationState::Transcribing;
         self.latency.mark_transcribe_start();
 
-        let model = match decision.tier {
-            ModelTier::Cheap => settings.transcription_provider.model.clone(),
-            ModelTier::Accurate => settings
-                .transcription_provider
-                .accurate_model
-                .clone()
-                .unwrap_or_else(|| settings.transcription_provider.model.clone()),
-        };
-
-        let segment = AudioSegment {
-            pcm_i16: trim.trimmed.clone(),
-            sample_rate: SAMPLE_RATE,
-            duration_secs: trim.trimmed_duration_secs,
-        };
-        let opts = TranscribeOpts {
-            model: model.clone(),
-            language: None,
-            prompt: None,
-        };
-
-        let transcription_client = Self::resolve_client(&settings.transcription_provider).await;
-        let transcript = match transcription_client.transcribe(&segment, &opts).await {
+        let model = format!("whisper/{}", settings.whisper.model_id);
+        let raw_transcript = match self
+            .whisper
+            .transcribe_pcm_i16(&trim.trimmed, SAMPLE_RATE)
+            .await
+        {
             Ok(t) => t,
             Err(e) => return Ok(self.error_result(format!("Transcription failed: {e}"))),
         };
 
         self.latency.mark_transcribe_done();
 
-        let is_self_hosted = settings.transcription_provider.kind == ProviderKind::CustomEndpoint;
-        let estimated_usd = if is_self_hosted {
-            0.0
-        } else {
-            estimate_openai_cost_usd(&model, trim.trimmed_duration_secs)
-        };
-        let provider_id = settings.transcription_provider.resolved_base_url();
+        // Silence transcribes to non-speech markers, which are stripped to
+        // nothing upstream — surface that as "no speech" instead of pasting.
+        if raw_transcript.trim().is_empty() {
+            return Ok(self.error_result("No speech detected — check the mic is picking you up"));
+        }
 
-        let mut transcript_text = apply_rules(&transcript.text, output_mode);
+        let estimated_usd = 0.0_f32;
+        let provider_id = "local-whisper".to_string();
+        let is_self_hosted = true;
+
+        let mut transcript_text = apply_rules(&raw_transcript, output_mode);
         transcript_text = apply_snippets(&transcript_text, &settings.snippets);
         transcript_text = apply_dictionary(&transcript_text, &settings.dictionary);
 
@@ -273,7 +276,7 @@ impl DictationPipeline {
             date: chrono::Local::now().date_naive(),
             duration_raw_secs: trim.raw_duration_secs,
             duration_billable_secs: trim.trimmed_duration_secs,
-            provider: provider_id,
+            provider: provider_id.clone(),
             model: model.clone(),
             estimated_usd,
             was_self_hosted: is_self_hosted,
@@ -344,5 +347,13 @@ impl DictationPipeline {
 
     pub fn export_history_csv(&self, limit: u32) -> Result<String> {
         Ok(self.history.export_csv(limit)?)
+    }
+
+    pub async fn paste_text(&self, text: &str) -> Result<InsertResult> {
+        let settings = self.settings.read().await.clone();
+        self.inserter
+            .insert(text, settings.clipboard_restore)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 }

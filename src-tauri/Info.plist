@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Without this key macOS never prompts for microphone access, never lists
+	     the app under Privacy & Security > Microphone, and silently feeds the
+	     process digital silence. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VoxFlow records your voice so it can transcribe it to text locally on this Mac.</string>
+</dict>
+</plist>

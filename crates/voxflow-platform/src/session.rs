@@ -20,6 +20,13 @@ pub enum WaylandCompositor {
     Unknown,
 }
 
+impl DesktopSession {
+    #[cfg(target_os = "linux")]
+    pub fn is_wayland(&self) -> bool {
+        matches!(self, DesktopSession::LinuxWayland { .. })
+    }
+}
+
 impl WaylandCompositor {
     /// `wlr-layer-shell` support: everything except GNOME (Mutter has a
     /// deliberate policy of not implementing this protocol). `Unknown` is
@@ -35,7 +42,8 @@ impl WaylandCompositor {
         matches!(self, Self::Kde | Self::Hyprland)
     }
 
-    fn from_xdg_current_desktop(value: &str) -> Self {
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    pub fn from_xdg_current_desktop(value: &str) -> Self {
         let lower = value.to_ascii_lowercase();
         if lower.contains("gnome") {
             Self::Gnome
@@ -57,7 +65,7 @@ impl WaylandCompositor {
 pub fn detect_session() -> DesktopSession {
     #[cfg(target_os = "macos")]
     {
-        return DesktopSession::MacOs;
+        DesktopSession::MacOs
     }
 
     #[cfg(target_os = "linux")]

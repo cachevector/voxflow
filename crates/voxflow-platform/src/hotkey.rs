@@ -24,6 +24,15 @@ impl HotkeyBinding {
     /// needed on macOS for the common case.
     pub fn default_binding() -> Self {
         Self {
+            modifiers: Modifiers::ALT | Modifiers::CONTROL,
+            code: Code::Space,
+            label: "Option+Ctrl".into(),
+        }
+    }
+
+    /// Legacy combo kept for X11/portal backends that require a real key.
+    pub fn legacy_combo_binding() -> Self {
+        Self {
             modifiers: Modifiers::SUPER | Modifiers::SHIFT,
             code: Code::Space,
             label: "Super+Shift+Space".into(),

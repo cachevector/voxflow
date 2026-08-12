@@ -68,6 +68,16 @@ impl TextInserter for ClipboardPasteInserter {
     }
 }
 
+/// `kVK_ANSI_V`. On macOS, `Key::Unicode('v')` resolves the keycode through the
+/// Text Services Manager (`TSMGetInputSourceProperty`), which asserts it is on
+/// the main thread and raises SIGTRAP anywhere else. Insertion runs on the
+/// dictation thread, so address the physical key directly instead — Cmd+V is
+/// bound by key position on macOS regardless of layout.
+#[cfg(target_os = "macos")]
+const PASTE_KEY: Key = Key::Other(0x09);
+#[cfg(not(target_os = "macos"))]
+const PASTE_KEY: Key = Key::Unicode('v');
+
 fn simulate_paste() -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
 
@@ -80,7 +90,7 @@ fn simulate_paste() -> Result<(), String> {
         .key(modifier, Direction::Press)
         .map_err(|e| e.to_string())?;
     enigo
-        .key(Key::Unicode('v'), Direction::Click)
+        .key(PASTE_KEY, Direction::Click)
         .map_err(|e| e.to_string())?;
     enigo
         .key(modifier, Direction::Release)

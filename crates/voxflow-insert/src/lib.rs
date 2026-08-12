@@ -4,6 +4,8 @@ use thiserror::Error;
 
 mod clipboard_paste;
 mod copy_only;
+#[cfg(target_os = "linux")]
+mod wayland_portal;
 pub use clipboard_paste::ClipboardPasteInserter;
 pub use copy_only::CopyOnlyInserter;
 

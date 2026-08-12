@@ -40,9 +40,9 @@ pub struct HotkeyConfig {
 impl Default for HotkeyConfig {
     fn default() -> Self {
         Self {
-            key_code: 59, // Left Control — present on all Mac/PC keyboards
+            key_code: 0,
             modifiers: 0,
-            label: "Left Control".into(),
+            label: "Option+Ctrl".into(),
         }
     }
 }
@@ -104,9 +104,9 @@ impl ProviderConfig {
 
     pub fn default_rewrite() -> Self {
         Self {
-            kind: ProviderKind::OpenAi,
+            kind: ProviderKind::Groq,
             base_url: None,
-            model: "gpt-4o-mini".into(),
+            model: "llama-3.1-8b-instant".into(),
             accurate_model: None,
             api_key_ref: Some("rewrite".into()),
         }
@@ -214,12 +214,30 @@ pub enum LicenseTier {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhisperConfig {
+    /// GGML model id without prefix, e.g. `small.en`.
+    pub model_id: String,
+    pub prewarm_on_launch: bool,
+}
+
+impl Default for WhisperConfig {
+    fn default() -> Self {
+        Self {
+            model_id: "small.en".into(),
+            prewarm_on_launch: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub schema_version: u32,
     pub quality_mode: QualityMode,
     pub dictation_mode: DictationMode,
     pub hotkey: HotkeyConfig,
     pub microphone_device: Option<String>,
+    #[serde(default)]
+    pub whisper: WhisperConfig,
     pub transcription_provider: ProviderConfig,
     pub rewrite_provider: ProviderConfig,
     /// AI rewrite pass runs on every transcript by default (not Pro-gated).
@@ -260,15 +278,16 @@ pub enum BarPosition {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            schema_version: 2,
+            schema_version: 3,
             quality_mode: QualityMode::Hybrid,
             dictation_mode: DictationMode::PushToTalk,
             hotkey: HotkeyConfig::default(),
             microphone_device: None,
+            whisper: WhisperConfig::default(),
             transcription_provider: ProviderConfig::default_transcription(),
             rewrite_provider: ProviderConfig::default_rewrite(),
             rewrite_enabled: true,
-            rewrite_prompt: "Rewrite this dictated speech into a clean, well-formed sentence. Fix grammar, punctuation, and filler words. Keep the original meaning and tone.".into(),
+            rewrite_prompt: "You clean up dictated speech. Remove filler words and false starts (um, uh, hmm, er). Fix grammar, punctuation, and capitalization. Do NOT change meaning, add content, or rephrase for style. Return ONLY the corrected text with no quotes or markdown.".into(),
             session_cap_seconds: 120,
             clipboard_restore: true,
             launch_at_login: false,

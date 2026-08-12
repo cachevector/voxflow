@@ -4,6 +4,7 @@ members = [
     "crates/voxflow-core",
     "crates/voxflow-audio",
     "crates/voxflow-vad",
+    "crates/voxflow-whisper",
     "crates/voxflow-provider",
     "crates/voxflow-router",
     "crates/voxflow-insert",
@@ -12,10 +13,10 @@ members = [
     "crates/voxflow-config",
     "crates/voxflow-secrets",
     "crates/voxflow-platform",
-    "crates/voxflow-app",
     "crates/voxflowctl",
+    "src-tauri",
 ]
-default-members = ["crates/voxflow-app"]
+default-members = ["src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
@@ -57,6 +58,7 @@ voxflow-provider = { path = "crates/voxflow-provider" }
 voxflow-router = { path = "crates/voxflow-router" }
 voxflow-secrets = { path = "crates/voxflow-secrets" }
 voxflow-vad = { path = "crates/voxflow-vad" }
+voxflow-whisper = { path = "crates/voxflow-whisper" }
 voxflow-platform = { path = "crates/voxflow-platform" }
 
 [profile.release]

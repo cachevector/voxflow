@@ -1,5 +1,10 @@
 use voxflow_config::OutputMode;
 
+/// Default system prompt for the Groq cleanup pass (grammar + filler removal only).
+pub fn default_cleanup_prompt() -> &'static str {
+    "You clean up dictated speech. Remove filler words and false starts (um, uh, hmm, er). Fix grammar, punctuation, and capitalization. Do NOT change meaning, add content, or rephrase for style. Return ONLY the corrected text with no quotes or markdown."
+}
+
 /// Cheap, local, rule-based normalization applied before the AI rewrite pass
 /// (and as the only cleanup when the rewrite pass is disabled or fails).
 pub fn apply_rules(text: &str, mode: OutputMode) -> String {

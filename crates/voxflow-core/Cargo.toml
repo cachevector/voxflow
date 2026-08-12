@@ -24,3 +24,4 @@ voxflow-provider.workspace = true
 voxflow-router.workspace = true
 voxflow-secrets.workspace = true
 voxflow-vad.workspace = true
+voxflow-whisper.workspace = true

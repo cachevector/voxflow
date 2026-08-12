@@ -12,3 +12,6 @@ parking_lot.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.10", default-features = false, features = ["tokio"] }
