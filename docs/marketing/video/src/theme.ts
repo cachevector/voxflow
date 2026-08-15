@@ -1,0 +1,15 @@
+export const theme = {
+  ground: "#0b1219",
+  surface: "#111c26",
+  surface2: "#16232f",
+  line: "#1f3040",
+  text: "#eaf2f6",
+  muted: "#93a8b8",
+  faint: "#7b91a3",
+  signal: "#00b2c5",
+  signalBright: "#45dcec",
+  rewrite: "#e8a33d",
+  display: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+  body: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+  mono: '"SF Mono", Menlo, Consolas, monospace',
+} as const;

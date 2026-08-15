@@ -1,0 +1,20 @@
+{
+  "name": "voxflow-promo",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "start": "remotion studio src/index.ts",
+    "build": "remotion render src/index.ts VoxFlowPromo ../voxflow-promo.mp4 --overwrite --browser-executable \"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\""
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.512"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.512",
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.3"
+  }
+}
