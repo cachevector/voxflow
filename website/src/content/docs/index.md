@@ -43,8 +43,8 @@ is Rust. The web layer only draws.
 
 ## Project status
 
-VoxFlow is in early development. There is no signed release build yet: you build it from
-source, and you should expect rough edges.
+VoxFlow is in early development. The supported way to install it is the
+[macOS disk image](./install). Expect a few rough edges.
 
 - **macOS** is the supported platform today. macOS 13 or later, Apple Silicon recommended so
   Whisper can use Metal.

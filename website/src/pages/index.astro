@@ -128,7 +128,7 @@ const schema = [
     url: SITE.url,
     softwareVersion: "0.1.0",
     license: "https://opensource.org/licenses/MIT",
-    downloadUrl: SITE.repo,
+    downloadUrl: SITE.download,
     featureList: [
       "System-wide voice dictation with a global hotkey",
       "On-device Whisper transcription with Metal acceleration",
@@ -174,11 +174,11 @@ const schema = [
         in whatever app you were already in.
       </p>
       <div class="cta-row">
-        <a class="btn btn--primary" href={SITE.repo} rel="noopener">Build from source</a>
-        <a class="btn" href={withBase("/docs")}>Read the docs</a>
+        <a class="btn btn--primary" href={SITE.download} rel="noopener">Download for macOS</a>
+        <a class="btn" href={withBase("/docs/install")}>Install guide</a>
       </div>
       <p class="note">
-        macOS 13+ · Apple Silicon recommended · Linux in progress · early development, expect rough edges
+        macOS 13+ · Apple Silicon · open the DMG, drag to Applications · Linux in progress
       </p>
 
       <DictationTrace />
@@ -319,7 +319,7 @@ const schema = [
     <div class="wrap">
       <h2>Stop typing what you could just say.</h2>
       <div class="cta-row">
-        <a class="btn btn--primary" href={SITE.repo} rel="noopener">Build from source</a>
+        <a class="btn btn--primary" href={SITE.download} rel="noopener">Download for macOS</a>
         <a class="btn" href={withBase("/docs/install")}>Install guide</a>
       </div>
     </div>

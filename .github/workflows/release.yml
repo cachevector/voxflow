@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install CMake
+        run: brew install cmake
+      - run: pnpm install
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
+          releaseName: VoxFlow ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
+          releaseBody: |
+            Download **VoxFlow-macos-arm64.dmg**, open it, and drag VoxFlow into Applications.
+
+            First launch: grant Microphone and Accessibility, then hold Option+Ctrl and speak.
+          releaseDraft: false
+          prerelease: false
+          args: --bundles dmg,app
+      - name: Attach stable DMG name
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          dmg=$(ls -1 target/release/bundle/dmg/VoxFlow_*.dmg | head -1)
+          tag="${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}"
+          cp "$dmg" target/release/bundle/dmg/VoxFlow-macos-arm64.dmg
+          if gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx 'VoxFlow-macos-arm64.dmg'; then
+            echo "stable DMG already attached; leaving it in place"
+          else
+            gh release upload "$tag" "target/release/bundle/dmg/VoxFlow-macos-arm64.dmg"
+          fi

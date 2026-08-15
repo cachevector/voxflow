@@ -6,6 +6,8 @@ export const SITE = {
     "VoxFlow is a BYOK voice dictation app for macOS. Hold Option+Ctrl, speak, and get clean text at your cursor — local Whisper transcription, an AI cleanup pass, and no subscription.",
   url: "https://cachevector.github.io/voxflow",
   repo: "https://github.com/cachevector/voxflow",
+  download: "https://github.com/cachevector/voxflow/releases/latest/download/VoxFlow-macos-arm64.dmg",
+  releases: "https://github.com/cachevector/voxflow/releases/latest",
   studio: "MaskedSyntax",
   studioUrl: "https://maskedsyntax.com",
   ogImage: "/og.png",

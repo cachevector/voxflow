@@ -8,3 +8,7 @@ target/
 node_modules/
 dist/
 src-tauri/gen/
+*.p12
+*.cer
+certificate-base64.txt
+AuthKey_*.p8

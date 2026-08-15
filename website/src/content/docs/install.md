@@ -1,50 +1,39 @@
 ---
 title: Install on macOS
-description: Build and run VoxFlow from source on macOS, including prerequisites, the dev loop, and where the app stores its data.
+description: Download the VoxFlow DMG, drag it into Applications, and start dictating.
 group: Start here
 order: 2
 sidebarLabel: Install
 ---
 
-VoxFlow has no signed release build yet, so you build it from source. This takes a few
-minutes the first time — `whisper.cpp` and the Rust workspace both need compiling.
+VoxFlow ships as a signed macOS disk image. You do not need Rust, Node, or a
+compiler.
 
-## Prerequisites
+## Download and install
 
-- **macOS 13 or later.** Apple Silicon is recommended: it is what makes Metal-accelerated
-  Whisper fast enough to stay inside the latency budget.
-- **Rust**, stable channel, via [rustup](https://rustup.rs).
-- **Xcode Command Line Tools** — `xcode-select --install`.
-- **CMake**, needed to build `whisper-rs`. `brew install cmake`.
-- **Node.js 20+ and pnpm 9+** for the Tauri shell.
+1. Download [VoxFlow for macOS](https://github.com/cachevector/voxflow/releases/latest/download/VoxFlow-macos-arm64.dmg)
+   (Apple Silicon).
+2. Open the `.dmg` and drag **VoxFlow** into **Applications**.
+3. Eject the disk image and launch VoxFlow from Applications or Spotlight.
+4. The app lives in the menu bar. There is no dock icon and no main window by
+   default.
 
-## Build and run
+macOS 13 or later. Apple Silicon is what the release build targets, so Whisper
+can use Metal.
 
-```bash
-git clone https://github.com/cachevector/voxflow.git
-cd voxflow
-pnpm install
-pnpm tauri dev
-```
-
-`pnpm tauri dev` runs the app with hot reload on the frontend. For a standalone build:
-
-```bash
-pnpm tauri build
-```
-
-The first Rust build is slow because the whole workspace and `whisper.cpp` compile from
-scratch. Later builds are incremental.
+If macOS says the app cannot be opened because it is from an unidentified
+developer, right-click VoxFlow in Applications, choose **Open**, then confirm.
+That prompt goes away once the release is notarized with a Developer ID.
 
 ## First run
 
-1. Launch the app. It lives in the menu bar — there is no dock icon and no main window by
-   default.
-2. macOS will ask for **Microphone** access the first time VoxFlow captures audio.
-3. Grant **Accessibility** access so the hotkey tap and paste can work. See
-   [Permissions](./permissions) — nothing works without this one.
-4. Open Settings from the tray icon and add a key for the rewrite pass, if you want one. See
-   [Provider keys](./providers).
+1. macOS will ask for **Microphone** access the first time VoxFlow captures
+   audio.
+2. Grant **Accessibility** so the hotkey and paste can work. See
+   [Permissions](./permissions). Nothing works without this one.
+3. Open Settings from the tray icon and add a key for the rewrite pass, if you
+   want one. See [Provider keys](./providers).
+4. Focus any text field. Hold <kbd>⌥</kbd> <kbd>⌃</kbd> and speak.
 
 ## Where things are stored
 
@@ -53,7 +42,21 @@ scratch. Later builds are incremental.
 | Settings | `~/Library/Application Support/com.maskedsyntax.VoxFlow/settings.json` |
 | Whisper models | `~/Library/Application Support/com.maskedsyntax.VoxFlow/models/` |
 | Provider keys | macOS Keychain (never in `settings.json`) |
-| Transcript history | Local SQLite database in the same app support directory |
+| Transcript history | Local SQLite database in the same application support directory |
 
-To remove VoxFlow completely, delete the app, that application support directory, and the
-VoxFlow entries in Keychain Access.
+To remove VoxFlow completely, delete the app, that application support
+directory, and the VoxFlow entries in Keychain Access.
+
+## Build from source
+
+If you want a development build instead of the DMG:
+
+```bash
+git clone https://github.com/cachevector/voxflow.git
+cd voxflow
+pnpm install
+pnpm tauri dev
+```
+
+You will need Rust (stable), Xcode Command Line Tools, CMake, Node.js 20+, and
+pnpm 9+. Details are in [docs/macos-setup.md](https://github.com/cachevector/voxflow/blob/master/docs/macos-setup.md).

@@ -65,18 +65,17 @@ Same idea as the paid dictation apps. Different economics, and a different priva
 
 ## Get it on your Mac
 
-Early development. You build from source. Expect a few rough edges.
+macOS 13+, Apple Silicon.
 
-```bash
-git clone https://github.com/cachevector/voxflow.git
-cd voxflow
-pnpm install
-pnpm tauri dev
-```
+1. Download [VoxFlow-macos-arm64.dmg](https://github.com/cachevector/voxflow/releases/latest/download/VoxFlow-macos-arm64.dmg).
+2. Open the disk image and drag VoxFlow into Applications.
+3. Launch it from Applications. It lives in the menu bar.
+4. Grant Microphone and Accessibility when macOS asks.
+5. Focus a text field. Hold **Option+Ctrl**. Talk.
 
-Grant Microphone and Accessibility when macOS asks. Open Settings from the menu bar. Focus a text field. Hold **Option+Ctrl**. Talk.
+If macOS blocks the first open, right-click VoxFlow, choose Open, and confirm.
 
-Need the longer path, Linux notes, or provider setup? Start at [the docs](https://cachevector.github.io/voxflow/docs) or [docs/macos-setup.md](docs/macos-setup.md).
+Need Linux notes, provider setup, or a source build? Start at [the docs](https://cachevector.github.io/voxflow/docs) or [docs/macos-setup.md](docs/macos-setup.md).
 
 ## License
 

@@ -1,5 +1,9 @@
 # macOS Development Setup
 
+Users should install from the
+[DMG](https://github.com/cachevector/voxflow/releases/latest/download/VoxFlow-macos-arm64.dmg).
+This page is the source-build path.
+
 ## Prerequisites
 
 - macOS 13+ (Apple Silicon recommended for Metal-accelerated Whisper)
