@@ -1,0 +1,98 @@
+---
+import Logo from "./Logo.astro";
+import { SITE, withBase } from "../site";
+const year = new Date().getFullYear();
+---
+<footer class="foot">
+  <div class="wrap grid">
+    <div>
+      <a href={withBase("/")} class="brand"><Logo size={22} /><span>VoxFlow</span></a>
+      <p class="blurb">Voice dictation for macOS that runs on your own key, keeps your transcripts on your machine, and stays out of the way.</p>
+    </div>
+    <nav aria-label="Product">
+      <h2>Product</h2>
+      <a href={withBase("/#how")}>How it works</a>
+      <a href={withBase("/#byok")}>Bring your own key</a>
+      <a href={withBase("/#privacy")}>Privacy</a>
+      <a href={withBase("/#pricing")}>Pricing</a>
+    </nav>
+    <nav aria-label="Documentation">
+      <h2>Docs</h2>
+      <a href={withBase("/docs")}>Introduction</a>
+      <a href={withBase("/docs/install")}>Install on macOS</a>
+      <a href={withBase("/docs/permissions")}>Permissions</a>
+      <a href={withBase("/docs/providers")}>Provider keys</a>
+    </nav>
+    <nav aria-label="Project">
+      <h2>Project</h2>
+      <a href={SITE.repo} rel="noopener">Source on GitHub</a>
+      <a href={`${SITE.repo}/issues`} rel="noopener">Report an issue</a>
+      <a href={SITE.studioUrl} rel="noopener">MaskedSyntax</a>
+    </nav>
+  </div>
+  <div class="wrap base">
+    <p>© {year} {SITE.studio}. MIT licensed.</p>
+    <p class="mono">cachevector.github.io/voxflow</p>
+  </div>
+</footer>
+
+<style>
+  .foot {
+    border-top: 1px solid var(--line-soft);
+    padding-top: 3.5rem;
+    margin-top: 5rem;
+    font-size: 0.9rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.6fr repeat(3, 1fr);
+    gap: 2.5rem;
+    padding-bottom: 3rem;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+  }
+  .blurb {
+    margin-top: 0.8rem;
+    max-width: 34ch;
+    color: var(--text-faint);
+    line-height: 1.6;
+  }
+  nav h2 {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 0.9rem;
+  }
+  nav a {
+    display: block;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 0.22rem 0;
+    transition: color 0.15s ease;
+  }
+  nav a:hover { color: var(--signal-bright); }
+  .base {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-block: 1.25rem;
+    border-top: 1px solid var(--line-soft);
+    color: var(--text-faint);
+  }
+  .base p { font-size: 0.83rem; }
+  .mono { font-family: var(--font-mono); }
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr 1fr; gap: 2rem; }
+  }
+</style>

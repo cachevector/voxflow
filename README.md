@@ -1,31 +1,83 @@
-# VoxFlow
+<p align="center">
+  <img src="docs/logo.png" alt="VoxFlow logo" width="144" />
+</p>
 
-Wispr Flow–style dictation for **macOS** (Linux in progress): hold or toggle **Option+Ctrl**, speak, get local Whisper transcription, Groq-powered grammar/filler cleanup, and automatic paste at the cursor—with history for recovery.
+<h1 align="center">VoxFlow</h1>
 
-## Stack
+<p align="center"><strong>Speak anywhere. VoxFlow writes it for you.</strong></p>
 
-- **Tauri 2 + React** — settings window, bottom-center overlay pill, tray
-- **Rust workspace** — CPAL audio, WebRTC VAD, whisper.cpp (`whisper-rs` + Metal), Groq chat cleanup, clipboard paste, SQLite history
-- **macOS** — `CGEventTap` for Option+Ctrl; Accessibility for paste
+<p align="center">
+  Hold Option+Ctrl. Say the thing. Let go.<br />
+  Clean text lands at your cursor, in whatever app you were already in.
+</p>
 
-## Quick start (macOS)
+<p align="center">
+  <a href="https://cachevector.github.io/voxflow">cachevector.github.io/voxflow</a>
+  &nbsp;|&nbsp;
+  <a href="https://cachevector.github.io/voxflow/docs">Docs</a>
+</p>
+
+VoxFlow is voice dictation for macOS that feels like part of the OS. Whisper transcribes on your machine. An AI pass turns the rambling into a sentence. The result is pasted where you were already typing.
+
+No subscription. No account. You bring the key, or you bring nothing at all and stay fully local.
+
+macOS 13 or later. Apple Silicon recommended. Linux is on the way.
+
+## The workflow
+
+Five stages between your voice and your cursor.
+
+1. **Hold the keys.** Option+Ctrl, anywhere in macOS. A small pill fades in at the bottom of the screen. Nothing takes focus. Nothing covers what you were reading.
+2. **Speak.** Audio is captured and gated by a voice activity detector, so the silence at either end never reaches the model.
+3. **Whisper transcribes on device.** Your audio does not leave the machine.
+4. **An AI pass cleans it up.** Fillers drop. Grammar lands. You get a sentence you would have typed. On by default, not a paid add-on. Turn it off if you want.
+5. **It lands at your cursor.** Editor, terminal, browser, chat, mail. Every transcript is kept locally so you can recover one you lost.
+
+Hold for short phrases. Toggle for long ones. The pill is up in 80 ms. A short phrase is text inside 1.5 seconds.
+
+## Why people switch
+
+**It stays out of the way.** One pill while you talk, and nothing else. No window. No stolen focus. No modal.
+
+**It is fast enough to trust.** The hot path is Rust. The interface only draws what already happened.
+
+**Your audio stays home.** Only the transcript text is sent to a rewrite provider, and only if you want a rewrite. Skip the cloud and VoxFlow makes no network calls.
+
+**It works where you write.** The same hotkey works in Cursor, VS Code, Slack, Gmail, Notion, Obsidian, browsers, and terminals.
+
+**Your keys stay in the Keychain.** Never in a plaintext settings file. History is a SQLite file you own.
+
+**Costs stay visible.** Each dictation is tracked. The month is projected. You get a warning at the cap you set.
+
+## Your voice. Your key. Your price.
+
+Transcription is local. The rewrite pass talks to any OpenAI-compatible endpoint, or to nobody.
+
+| How you run it | What you pay VoxFlow | What leaves the machine |
+| --- | --- | --- |
+| Fully local | Nothing | Nothing |
+| Local Whisper + cloud rewrite | Nothing | A short piece of text |
+| Your own server | Nothing | Whatever you pointed it at |
+
+VoxFlow is free to build today, MIT licensed. There is no VoxFlow subscription for minutes of speech. You pay Groq, OpenAI, or your own hardware directly for exactly what you use.
+
+Same idea as the paid dictation apps. Different economics, and a different privacy model.
+
+## Get it on your Mac
+
+Early development. You build from source. Expect a few rough edges.
 
 ```bash
+git clone https://github.com/cachevector/voxflow.git
+cd voxflow
 pnpm install
 pnpm tauri dev
 ```
 
-See [docs/macos-setup.md](docs/macos-setup.md) for permissions (Microphone, Accessibility) and [docs/linux-setup.md](docs/linux-setup.md) for Linux notes.
+Grant Microphone and Accessibility when macOS asks. Open Settings from the menu bar. Focus a text field. Hold **Option+Ctrl**. Talk.
 
-## Project structure
-
-```
-crates/          # Rust pipeline (audio, vad, whisper, provider, insert, history, platform, …)
-src-tauri/       # Tauri host: hotkey tap, tray, commands
-src/             # React UI (settings + overlay)
-docs/
-```
+Need the longer path, Linux notes, or provider setup? Start at [the docs](https://cachevector.github.io/voxflow/docs) or [docs/macos-setup.md](docs/macos-setup.md).
 
 ## License
 
-MIT
+MIT. Read every line before you trust it with a microphone.

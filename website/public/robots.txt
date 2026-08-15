@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cachevector.github.io/voxflow/sitemap-index.xml

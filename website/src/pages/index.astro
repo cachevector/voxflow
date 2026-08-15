@@ -1,0 +1,571 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import DictationTrace from "../components/DictationTrace.astro";
+import { SITE, withBase } from "../site";
+
+// The pipeline is a genuine ordered sequence — the stages are numbered because
+// order is information here, not decoration.
+const stages = [
+  {
+    n: "01",
+    title: "Hold the keys",
+    body: "Hold Option+Ctrl anywhere in macOS. A small pill fades in at the bottom of the screen. Nothing takes focus, nothing covers what you were reading.",
+    meta: "CGEventTap · no letter-key shortcut to collide with",
+  },
+  {
+    n: "02",
+    title: "Speak",
+    body: "Audio is captured through CoreAudio and gated by a voice activity detector, so the silence at either end never reaches the model.",
+    meta: "CPAL capture · WebRTC VAD",
+  },
+  {
+    n: "03",
+    title: "Whisper transcribes on device",
+    body: "Transcription runs locally through whisper.cpp with Metal acceleration. Your audio does not leave the machine.",
+    meta: "whisper-rs · Metal",
+  },
+  {
+    n: "04",
+    title: "An AI pass cleans it up",
+    body: "The raw transcript goes through a rewrite pass that drops fillers, fixes grammar, and returns a sentence you would have typed. On by default, not a paid add-on.",
+    meta: "Groq, OpenAI, or your own endpoint",
+  },
+  {
+    n: "05",
+    title: "It lands at your cursor",
+    body: "The finished text is pasted into whatever app had focus — editor, terminal, browser, chat. Every transcript is kept locally so you can recover one you lost.",
+    meta: "Accessibility paste · SQLite history",
+  },
+];
+
+const features = [
+  {
+    title: "Stays out of the way",
+    body: "One pill at the bottom of the screen while you talk, and nothing else. No window opens, no focus is stolen, no modal interrupts you.",
+  },
+  {
+    title: "Fast enough to trust",
+    body: "The pill is up in 80 ms and text lands inside 1.5 seconds for a short phrase. The hot path is Rust; the interface only renders.",
+  },
+  {
+    title: "Your audio stays home",
+    body: "Whisper runs on device. Only the transcript text is sent to a rewrite provider — and you choose which one, or skip the cloud entirely.",
+  },
+  {
+    title: "Works where you write",
+    body: "Insertion is system-wide, so the same hotkey works in Cursor, VS Code, Slack, Gmail, Notion, Obsidian, browsers, and terminals.",
+  },
+  {
+    title: "Keys live in the Keychain",
+    body: "Provider keys are stored through the macOS Keychain, never in a plaintext settings file. Local history is a SQLite file you own.",
+  },
+  {
+    title: "Costs you can see",
+    body: "VoxFlow tracks what each dictation costs, projects the month, and warns you at 50, 80, and 100 percent of a cap you set.",
+  },
+];
+
+const providers = [
+  {
+    name: "Fully local",
+    cost: "$0",
+    unit: "per month",
+    body: "Whisper on device for transcription, rewrite pass off. Nothing leaves the machine.",
+    accent: false,
+  },
+  {
+    name: "Local + cloud rewrite",
+    cost: "cents",
+    unit: "per month",
+    body: "Local Whisper, with Groq or OpenAI handling only the cleanup pass on short text.",
+    accent: true,
+  },
+  {
+    name: "Your own server",
+    cost: "$0",
+    unit: "marginal",
+    body: "Point VoxFlow at any OpenAI-compatible server you run — a home box over Tailscale, say.",
+    accent: false,
+  },
+];
+
+const faqs = [
+  {
+    q: "Does my voice get sent to the cloud?",
+    a: "No. Transcription runs on your Mac through whisper.cpp with Metal acceleration. Only the resulting text is sent to a rewrite provider, and you can turn the rewrite pass off to keep everything on device.",
+  },
+  {
+    q: "Is VoxFlow a subscription?",
+    a: "No. VoxFlow is BYOK — you connect your own provider key and pay that provider directly for what you use. There is no VoxFlow subscription to transcribe your speech.",
+  },
+  {
+    q: "Which apps does it work in?",
+    a: "Any app that accepts text. Insertion happens at the system level through macOS Accessibility, so the same hotkey works in editors, terminals, browsers, chat apps, and email.",
+  },
+  {
+    q: "What is the hotkey?",
+    a: "Option+Ctrl by default, held or toggled. It uses a CGEventTap rather than a letter-key global shortcut, so it does not collide with shortcuts inside the app you are using.",
+  },
+  {
+    q: "Which platforms are supported?",
+    a: "macOS 13 or later, with Apple Silicon recommended for Metal-accelerated Whisper. Linux support is in progress.",
+  },
+  {
+    q: "How is this different from Wispr Flow?",
+    a: "Same idea, different economics and privacy model. VoxFlow transcribes on device, stores your keys in the Keychain, keeps history in a local SQLite file, and runs on your own provider key instead of a monthly subscription.",
+  },
+];
+
+const schema = [
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "VoxFlow",
+    applicationCategory: "UtilitiesApplication",
+    applicationSubCategory: "Voice dictation",
+    operatingSystem: "macOS 13+",
+    description: SITE.description,
+    url: SITE.url,
+    softwareVersion: "0.1.0",
+    license: "https://opensource.org/licenses/MIT",
+    downloadUrl: SITE.repo,
+    featureList: [
+      "System-wide voice dictation with a global hotkey",
+      "On-device Whisper transcription with Metal acceleration",
+      "AI rewrite pass that cleans up filler words and grammar",
+      "Bring your own provider key, or self-host",
+      "Local SQLite transcript history",
+      "Per-dictation cost tracking with monthly caps",
+    ],
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+      description: "Free and MIT licensed. Bring your own provider key.",
+    },
+    author: { "@type": "Organization", name: SITE.studio, url: SITE.studioUrl },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  },
+];
+---
+
+<BaseLayout
+  title="VoxFlow — Voice dictation for macOS that runs on your own key"
+  description={SITE.description}
+  bare
+  schema={schema}
+>
+  <!-- ── Hero ─────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Dictation for macOS · MIT licensed · bring your own key</p>
+      <h1>Speak anywhere.<br /><em>VoxFlow writes it for you.</em></h1>
+      <p class="lede">
+        Hold <kbd>⌥</kbd> <kbd>⌃</kbd>, say the thing, let go. Whisper transcribes it on your
+        Mac, an AI pass turns the rambling into a sentence, and the text lands at your cursor
+        in whatever app you were already in.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn--primary" href={SITE.repo} rel="noopener">Build from source</a>
+        <a class="btn" href={withBase("/docs")}>Read the docs</a>
+      </div>
+      <p class="note">
+        macOS 13+ · Apple Silicon recommended · Linux in progress · early development, expect rough edges
+      </p>
+
+      <DictationTrace />
+    </div>
+  </section>
+
+  <!-- ── How it works ─────────────────────────────────── -->
+  <section id="how" class="band">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Five stages between your voice and your cursor.</h2>
+        <p class="section-sub">
+          Everything on the hot path is Rust — the hotkey tap, audio capture, the voice
+          detector, the state machine. The interface only draws what already happened.
+        </p>
+      </header>
+
+      <ol class="stages">
+        {stages.map((s) => (
+          <li class="stage">
+            <span class="stage-n mono">{s.n}</span>
+            <div>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
+              <p class="stage-meta mono">{s.meta}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── Features ─────────────────────────────────────── -->
+  <section class="band band--tint">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">What you get</p>
+        <h2>Built to feel like part of the OS.</h2>
+      </header>
+      <div class="cards">
+        {features.map((f) => (
+          <article class="card">
+            <h3>{f.title}</h3>
+            <p>{f.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BYOK ─────────────────────────────────────────── -->
+  <section id="byok" class="band">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">Bring your own key</p>
+        <h2>Pick where the work happens.</h2>
+        <p class="section-sub">
+          Transcription is local by default. The rewrite pass talks to any OpenAI-compatible
+          endpoint, so you can route it to Groq, to OpenAI, to a machine in your own house, or
+          turn it off entirely.
+        </p>
+      </header>
+      <div class="providers">
+        {providers.map((p) => (
+          <article class:list={["provider", { "provider--accent": p.accent }]}>
+            <h3>{p.name}</h3>
+            <p class="price"><span class="mono">{p.cost}</span> <small>{p.unit}</small></p>
+            <p>{p.body}</p>
+          </article>
+        ))}
+      </div>
+      <p class="fineprint">
+        Costs depend on your own provider and usage. VoxFlow tracks each dictation and
+        projects your month so nothing arrives as a surprise. See
+        <a href={withBase("/docs/providers")}>provider keys</a> for setup.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Privacy ──────────────────────────────────────── -->
+  <section id="privacy" class="band band--tint">
+    <div class="wrap privacy">
+      <div>
+        <p class="eyebrow">Privacy</p>
+        <h2>Your voice never has to leave the machine.</h2>
+      </div>
+      <ul class="checks">
+        <li>Audio is transcribed on device by Whisper — no upload, no account, no telemetry.</li>
+        <li>Provider keys are stored in the macOS Keychain, not in a settings file.</li>
+        <li>Transcript history is a local SQLite database you can read or delete yourself.</li>
+        <li>Turn the rewrite pass off and VoxFlow makes no network calls at all.</li>
+        <li>The whole thing is MIT licensed, so you can read every line before trusting it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── Pricing ──────────────────────────────────────── -->
+  <section id="pricing" class="band">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">Pricing</p>
+        <h2>Pay for the app once, if at all. Never for the minutes.</h2>
+        <p class="section-sub">
+          VoxFlow is open source and free to build today. The plan is to keep local
+          transcription, one provider, and the hotkey free forever, and to charge a single
+          lifetime price for the power-user layer — multiple providers, per-app profiles,
+          custom commands, the cost dashboard, snippets and vocabulary.
+        </p>
+      </header>
+      <p class="fineprint">
+        No subscription for transcription. You bring the key; you pay your provider directly
+        for exactly what you use.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── FAQ ──────────────────────────────────────────── -->
+  <section id="faq" class="band band--tint">
+    <div class="wrap">
+      <header class="section-head">
+        <p class="eyebrow">Questions</p>
+        <h2>The things people ask first.</h2>
+      </header>
+      <div class="faq">
+        {faqs.map((f) => (
+          <details>
+            <summary><h3>{f.q}</h3></summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Close ────────────────────────────────────────── -->
+  <section class="band close">
+    <div class="wrap">
+      <h2>Stop typing what you could just say.</h2>
+      <div class="cta-row">
+        <a class="btn btn--primary" href={SITE.repo} rel="noopener">Build from source</a>
+        <a class="btn" href={withBase("/docs/install")}>Install guide</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .mono { font-family: var(--font-mono); }
+
+  /* ── hero ── */
+  .hero {
+    position: relative;
+    padding-top: clamp(3.5rem, 9vw, 6.5rem);
+    padding-bottom: clamp(3rem, 7vw, 5rem);
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: -30% 0 auto 0;
+    height: 620px;
+    background: radial-gradient(60% 60% at 50% 40%, var(--signal-dim), transparent 72%);
+    pointer-events: none;
+  }
+  .hero .wrap { position: relative; }
+  h1 {
+    font-size: clamp(2.6rem, 7vw, 4.6rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    margin: 0.9rem 0 0;
+  }
+  h1 em {
+    font-style: normal;
+    color: var(--signal-bright);
+  }
+  .lede {
+    max-width: 56ch;
+    margin-top: 1.35rem;
+    font-size: clamp(1.02rem, 1.7vw, 1.19rem);
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  .cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-top: 1.9rem;
+  }
+  .note {
+    margin-top: 1.1rem;
+    margin-bottom: 3.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    letter-spacing: 0.01em;
+  }
+
+  /* ── section shell ── */
+  .band {
+    padding-block: clamp(3.5rem, 8vw, 6rem);
+    border-top: 1px solid var(--line-soft);
+  }
+  .band--tint { background: color-mix(in srgb, var(--surface) 45%, var(--ground)); }
+  .section-head { max-width: 60ch; margin-bottom: 2.8rem; }
+  .section-head h2 {
+    font-size: clamp(1.75rem, 3.6vw, 2.6rem);
+    margin-top: 0.75rem;
+  }
+  .section-sub {
+    margin-top: 1rem;
+    color: var(--text-muted);
+    font-size: 1.02rem;
+  }
+
+  /* ── stages ── */
+  .stages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0;
+    counter-reset: none;
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: 76px 1fr;
+    gap: 1.5rem;
+    padding: 1.6rem 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .stage:last-child { border-bottom: 1px solid var(--line-soft); }
+  .stage-n {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--signal);
+    padding-top: 0.28rem;
+    letter-spacing: 0.06em;
+  }
+  .stage h3 { font-size: 1.24rem; letter-spacing: -0.018em; }
+  .stage p {
+    margin-top: 0.5rem;
+    max-width: 62ch;
+    color: var(--text-muted);
+  }
+  .stage-meta {
+    margin-top: 0.65rem;
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    letter-spacing: 0.02em;
+  }
+
+  /* ── feature cards ── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+    gap: 1px;
+    background: var(--line-soft);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card {
+    background: var(--ground);
+    padding: 1.7rem 1.5rem;
+    transition: background 0.18s ease;
+  }
+  .card:hover { background: var(--surface); }
+  .card h3 { font-size: 1.06rem; letter-spacing: -0.012em; }
+  .card p {
+    margin-top: 0.55rem;
+    color: var(--text-muted);
+    font-size: 0.94rem;
+  }
+
+  /* ── providers ── */
+  .providers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+  .provider {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.6rem 1.4rem;
+    background: var(--surface);
+  }
+  .provider--accent {
+    border-color: color-mix(in srgb, var(--signal) 55%, var(--line));
+    background: linear-gradient(180deg, var(--signal-dim), var(--surface) 60%);
+  }
+  .provider h3 { font-size: 1.02rem; }
+  .price {
+    margin: 0.9rem 0 0.7rem;
+    font-family: var(--font-mono);
+    font-size: 1.75rem;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+  .price small {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--text-faint);
+    letter-spacing: 0.02em;
+  }
+  .provider p { color: var(--text-muted); font-size: 0.92rem; }
+  .fineprint {
+    margin-top: 1.5rem;
+    font-size: 0.88rem;
+    color: var(--text-faint);
+    max-width: 68ch;
+  }
+  .fineprint a { color: var(--signal-bright); }
+
+  /* ── privacy ── */
+  .privacy {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(2rem, 5vw, 4rem);
+    align-items: start;
+  }
+  .privacy h2 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); margin-top: 0.75rem; }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }
+  .checks li {
+    position: relative;
+    padding-left: 1.9rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .checks li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.55em;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1.5px solid var(--signal);
+    background: var(--signal-dim);
+  }
+
+  /* ── faq ── */
+  .faq {
+    border-top: 1px solid var(--line-soft);
+    max-width: 74ch;
+  }
+  details { border-bottom: 1px solid var(--line-soft); }
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 0;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary h3 {
+    font-family: var(--font-body);
+    font-size: 1.02rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    display: inline;
+  }
+  summary::after {
+    content: "+";
+    font-family: var(--font-mono);
+    font-size: 1.15rem;
+    color: var(--signal);
+    flex: none;
+    transition: transform 0.18s ease;
+  }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p {
+    padding-bottom: 1.25rem;
+    color: var(--text-muted);
+    max-width: 68ch;
+  }
+
+  /* ── close ── */
+  .close { text-align: center; }
+  .close h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); }
+  .close .cta-row { justify-content: center; margin-top: 1.6rem; }
+
+  @media (max-width: 780px) {
+    .privacy { grid-template-columns: 1fr; }
+    .stage { grid-template-columns: 52px 1fr; gap: 1rem; }
+  }
+</style>

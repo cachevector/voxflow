@@ -1,0 +1,52 @@
+---
+import Seo from "../components/Seo.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import { SITE, withBase } from "../site";
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description: string;
+  bare?: boolean;
+  type?: "website" | "article";
+  noindex?: boolean;
+  schema?: Record<string, unknown>[];
+}
+const { title, description, bare, type, noindex, schema = [] } = Astro.props;
+
+const organization = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: SITE.studio,
+  url: SITE.studioUrl,
+  brand: { "@type": "Brand", name: SITE.name, logo: `${SITE.url}/og.png` },
+};
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" href={withBase("/favicon.svg")} type="image/svg+xml" />
+    <link rel="sitemap" href={withBase("/sitemap-index.xml")} />
+    <meta name="theme-color" content="#0b1219" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f8f9" media="(prefers-color-scheme: light)" />
+    <Seo title={title} description={description} bare={bare} type={type} noindex={noindex} schema={[organization, ...schema]} />
+    <script is:inline>
+      // Applied before first paint so the chosen theme never flashes.
+      try {
+        const saved = localStorage.getItem("voxflow-theme");
+        const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+        document.documentElement.dataset.theme = saved ?? (prefersLight ? "light" : "dark");
+      } catch { document.documentElement.dataset.theme = "dark"; }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Nav />
+    <main id="main"><slot /></main>
+    <Footer />
+  </body>
+</html>

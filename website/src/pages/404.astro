@@ -1,0 +1,21 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { withBase } from "../site";
+---
+<BaseLayout title="Page not found" description="That page does not exist." noindex>
+  <section class="wrap nf">
+    <p class="eyebrow">404</p>
+    <h1>Nothing here to dictate into.</h1>
+    <p>That page does not exist. Try the docs, or head back to the homepage.</p>
+    <div class="row">
+      <a class="btn btn--primary" href={withBase("/")}>Home</a>
+      <a class="btn" href={withBase("/docs")}>Docs</a>
+    </div>
+  </section>
+</BaseLayout>
+<style>
+  .nf { padding-block: clamp(4rem, 14vh, 8rem); max-width: 52ch; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 0.8rem 0 1rem; }
+  p { color: var(--text-muted); }
+  .row { display: flex; gap: 0.7rem; margin-top: 2rem; }
+</style>

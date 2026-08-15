@@ -1,0 +1,55 @@
+---
+import { SITE } from "../site";
+
+interface Props {
+  title: string;
+  description: string;
+  /** Appends " — VoxFlow" unless the page is the homepage. */
+  bare?: boolean;
+  /** "website" for marketing pages, "article" for docs. */
+  type?: "website" | "article";
+  noindex?: boolean;
+  /** Extra JSON-LD blocks for this page. */
+  schema?: Record<string, unknown>[];
+}
+
+const { title, description, bare = false, type = "website", noindex = false, schema = [] } = Astro.props;
+
+const fullTitle = bare ? title : `${title} — ${SITE.name}`;
+// Trailing slash stripped, including on "/", so canonicals match the sitemap
+// entries @astrojs/sitemap emits for a trailingSlash: "never" site.
+// Pathname already includes the GitHub Pages base (`/voxflow/...`).
+const origin = new URL(SITE.url).origin;
+const canonical = new URL(Astro.url.pathname, origin).href.replace(/\/$/, "");
+const ogImage = `${SITE.url}${SITE.ogImage.startsWith("/") ? SITE.ogImage : `/${SITE.ogImage}`}`;
+---
+
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+<meta name="keywords" content={SITE.keywords.join(", ")} />
+<meta name="author" content={SITE.studio} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
+{!noindex && <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />}
+
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={SITE.name} />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="VoxFlow — voice dictation for macOS" />
+<meta property="og:locale" content="en_US" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImage} />
+
+{
+  schema.map((block) => (
+    <script type="application/ld+json" set:html={JSON.stringify(block)} is:inline />
+  ))
+}

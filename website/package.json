@@ -1,0 +1,27 @@
+{
+  "name": "voxflow-website",
+  "type": "module",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build && node scripts/make-og.mjs",
+    "preview": "astro preview",
+    "check": "astro check",
+    "og": "node scripts/make-og.mjs"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^7.0.5",
+    "@astrojs/sitemap": "^3.7.3",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/public-sans": "^5.3.0",
+    "astro": "^7.2.1",
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^5"
+  }
+}
