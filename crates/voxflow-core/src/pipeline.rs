@@ -11,7 +11,7 @@ use voxflow_cost::{build_dashboard, cap_reached, MonthlyUsage, UsageRecord};
 use voxflow_history::{new_entry, HistoryStore};
 use voxflow_insert::{InsertResult, InsertionBridge};
 use voxflow_provider::{
-    apply_dictionary, apply_rules, apply_snippets, system_prompt_for_mode,
+    apply_dictionary, apply_rules, apply_snippets, finalize_text, system_prompt_for_mode,
 };
 use voxflow_vad::{VoiceActivityDetector, SAMPLE_RATE};
 use voxflow_whisper::WhisperEngine;
@@ -63,6 +63,12 @@ impl DictationPipeline {
 
     pub fn state(&self) -> DictationState {
         self.state
+    }
+
+    /// Current mic input level (0.0..1.0) for the live overlay waveform.
+    /// Returns 0.0 when no capture is active.
+    pub fn current_level(&self) -> f32 {
+        self.capture.as_ref().map(|c| c.current_level()).unwrap_or(0.0)
     }
 
     pub async fn prewarm(&mut self) -> Result<()> {
@@ -230,6 +236,12 @@ impl DictationPipeline {
             }
         }
 
+        // Final sentence-level cleanup: capitalization, terminal punctuation,
+        // question detection, and a trailing space between dictations. Runs
+        // after the (optional) AI rewrite so it also cleans up local-only output
+        // and normalizes the AI result's spacing.
+        transcript_text = finalize_text(&transcript_text, output_mode);
+
         self.state = DictationState::Inserting;
         self.latency.mark_insert_start();
 
@@ -260,7 +272,7 @@ impl DictationPipeline {
 
         if settings.privacy.save_history {
             let entry = new_entry(
-                transcript_text.clone(),
+                transcript_text.trim().to_string(),
                 &provider_id,
                 &model,
                 trim.raw_duration_secs,

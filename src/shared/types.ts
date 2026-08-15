@@ -113,6 +113,7 @@ export type DictationState =
 export type UiState =
   | "idle"
   | "listening"
+  | "transcribing"
   | "cleaning"
   | "inserting"
   | "copied"

@@ -10,9 +10,8 @@ pub fn emit_state(app: &AppHandle, event: &StateEvent) {
     }
 }
 
-// Not called yet — the audio capture thread doesn't stream RMS samples out
-// to the pipeline yet. Wired up in Phase 1 alongside the overlay waveform.
-#[allow(dead_code)]
+// Streamed at ~30fps while listening (see hotkey_listener::spawn_amplitude_poller)
+// to drive the live overlay waveform.
 pub fn emit_amplitude(app: &AppHandle, level: f32) {
     if let Err(e) = app.emit(DICTATION_AMPLITUDE, level) {
         tracing::warn!("failed to emit amplitude event: {e}");

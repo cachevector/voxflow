@@ -56,6 +56,12 @@ impl DictationEngine {
         })
     }
 
+    /// Snapshot of the current mic input level (0.0..1.0) for the live overlay
+    /// waveform. Cheap enough to poll at frame rate while listening.
+    pub fn current_input_level(&self) -> f32 {
+        self.block_on(async { self.pipeline.read().await.current_level() })
+    }
+
     pub fn current_state(&self) -> DictationState {
         self.block_on(async { self.pipeline.read().await.state() })
     }

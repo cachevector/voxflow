@@ -1,24 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { events } from "@/shared/tauri";
 import type { StateEvent, UiState } from "@/shared/types";
 import { Waveform } from "./components/Waveform";
 import { StateLabel } from "./components/StateLabel";
 import { Timer } from "./components/Timer";
+import { LogoMark } from "./components/LogoMark";
 
 export default function App() {
   const [event, setEvent] = useState<StateEvent | null>(null);
   const [amplitude, setAmplitude] = useState(0);
-  const ampHistory = useRef<number[]>(new Array(32).fill(0));
 
   useEffect(() => {
     const unlistenState = events.onDictationState(setEvent);
-    const unlistenAmp = events.onDictationAmplitude((level) => {
-      const hist = ampHistory.current;
-      hist.push(level);
-      hist.shift();
-      setAmplitude(level);
-    });
+    const unlistenAmp = events.onDictationAmplitude(setAmplitude);
     return () => {
       unlistenState.then((f) => f());
       unlistenAmp.then((f) => f());
@@ -39,7 +34,8 @@ export default function App() {
             transition={{ duration: 0.12, ease: "easeOut" }}
             className="flex h-14 min-w-[220px] max-w-[420px] items-center gap-3 rounded-pill border border-white/10 bg-neutral-900/80 px-4 text-white shadow-lg backdrop-blur-md"
           >
-            <Waveform amplitude={amplitude} active={uiState === "listening"} history={ampHistory.current} />
+            <LogoMark amplitude={amplitude} active={uiState === "listening"} />
+            <Waveform amplitude={amplitude} active={uiState === "listening"} />
             <StateLabel state={uiState} message={event?.message ?? null} />
             {uiState === "listening" && <Timer />}
           </motion.div>

@@ -7,7 +7,9 @@ mod client;
 pub mod rewrite;
 
 pub use client::{OpenAiCompatibleClient, ProviderError};
-pub use rewrite::{apply_dictionary, apply_rules, apply_snippets, system_prompt_for_mode};
+pub use rewrite::{
+    apply_dictionary, apply_rules, apply_snippets, finalize_text, system_prompt_for_mode,
+};
 
 use serde::{Deserialize, Serialize};
 

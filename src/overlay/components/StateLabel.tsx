@@ -4,6 +4,7 @@ import type { UiState } from "@/shared/types";
 const LABELS: Record<UiState, string> = {
   idle: "",
   listening: "Listening",
+  transcribing: "Transcribing",
   cleaning: "Cleaning",
   inserting: "Inserting",
   copied: "Copied",

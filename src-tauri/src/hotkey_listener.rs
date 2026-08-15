@@ -78,10 +78,39 @@ fn start_dictation(app: &AppHandle) {
     let app_state = app.state::<AppState>();
     let event = app_state.engine.on_hotkey_down();
     events::emit_state(app, &event);
+    spawn_amplitude_poller(app.clone());
+}
+
+/// Streams the mic input level to the overlay while listening so the waveform
+/// reacts to the user's voice. Runs on its own OS thread (not the tokio
+/// runtime) because `current_input_level` blocks on the engine's runtime, and
+/// exits as soon as `LISTENING` clears on key release.
+fn spawn_amplitude_poller(app: AppHandle) {
+    let _ = std::thread::Builder::new()
+        .name("voxflow-amplitude-poller".into())
+        .spawn(move || {
+            while LISTENING.load(Ordering::SeqCst) {
+                let level = app.state::<AppState>().engine.current_input_level();
+                events::emit_amplitude(&app, level);
+                std::thread::sleep(Duration::from_millis(33)); // ~30 fps
+            }
+            // One final zero so the wave settles flat when recording stops.
+            events::emit_amplitude(&app, 0.0);
+        });
 }
 
 fn stop_dictation(app: &AppHandle) {
     LISTENING.store(false, Ordering::SeqCst);
+
+    // Leave the "listening" UI state the instant the key is released, before the
+    // blocking transcribe/rewrite/insert work runs. Otherwise the overlay keeps
+    // showing "Listening" with a running timer for the 2-3s of processing, which
+    // reads as the app failing to stop recording.
+    events::emit_state(
+        app,
+        &voxflow_core::StateEvent::new(voxflow_core::DictationState::Transcribing, None),
+    );
+
     let app_state = app.state::<AppState>();
     match app_state.engine.on_hotkey_up(None) {
         Ok(_) => {

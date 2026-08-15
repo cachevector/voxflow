@@ -123,6 +123,36 @@ impl AudioCapture {
         self.sample_rate
     }
 
+    /// Peak-normalized loudness of the most recently captured audio, without
+    /// draining the buffer. Drives the live overlay waveform while listening.
+    ///
+    /// Returns roughly 0.0 (silence) .. 1.0 (loud speech). We use peak rather
+    /// than pure RMS so brief consonants and transients still visibly move the
+    /// wave, then apply a gain so normal speaking levels fill most of the range.
+    pub fn current_level(&self) -> f32 {
+        const WINDOW: usize = 2_048; // ~40ms at 48kHz — a responsive meter window.
+        const GAIN: f32 = 3.5;
+
+        let buf = self.buffer.lock();
+        if buf.is_empty() {
+            return 0.0;
+        }
+        let start = buf.len().saturating_sub(WINDOW);
+        let window = &buf[start..];
+
+        let mut sum_sq = 0.0f32;
+        let mut peak = 0.0f32;
+        for &s in window {
+            sum_sq += s * s;
+            peak = peak.max(s.abs());
+        }
+        let rms = (sum_sq / window.len() as f32).sqrt();
+
+        // Blend RMS (body) with peak (transients) for a lively but stable meter.
+        let level = (0.6 * rms + 0.4 * peak) * GAIN;
+        level.clamp(0.0, 1.0)
+    }
+
     pub fn drain_samples(&self) -> Vec<f32> {
         let mut buf = self.buffer.lock();
         let samples = buf.clone();

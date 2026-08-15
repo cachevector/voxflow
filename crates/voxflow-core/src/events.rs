@@ -19,6 +19,7 @@ pub enum DictationState {
 pub enum UiState {
     Idle,
     Listening,
+    Transcribing,
     Cleaning,
     Inserting,
     Copied,
@@ -31,7 +32,7 @@ impl From<DictationState> for UiState {
         match state {
             DictationState::Idle => UiState::Idle,
             DictationState::Listening => UiState::Listening,
-            DictationState::Finalizing | DictationState::Transcribing => UiState::Listening,
+            DictationState::Finalizing | DictationState::Transcribing => UiState::Transcribing,
             DictationState::Cleaning => UiState::Cleaning,
             DictationState::Inserting => UiState::Inserting,
             DictationState::Copied => UiState::Copied,

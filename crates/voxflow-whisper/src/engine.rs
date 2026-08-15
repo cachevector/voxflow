@@ -109,13 +109,22 @@ impl WhisperEngine {
         let n = state
             .full_n_segments()
             .map_err(|e| WhisperError::Inference(e.to_string()))?;
+        // Whisper emits one segment per utterance chunk, each normally carrying a
+        // leading space (" Hello there." / " How are you?"). Each segment is
+        // trimmed and rejoined with exactly one space — trimming without
+        // re-adding the separator is what used to glue sentences together as
+        // "Hello there.How are you?".
         let mut text = String::new();
         for i in 0..n {
             if let Ok(segment) = state.full_get_segment_text(i) {
-                if !text.is_empty() && !segment.starts_with(' ') {
+                let segment = segment.trim();
+                if segment.is_empty() {
+                    continue;
+                }
+                if !text.is_empty() {
                     text.push(' ');
                 }
-                text.push_str(segment.trim());
+                text.push_str(segment);
             }
         }
         Ok(strip_non_speech_markers(text.trim()))
@@ -199,6 +208,25 @@ mod marker_tests {
             strip_non_speech_markers("check the value (see figure 3) first"),
             "check the value (see figure 3) first"
         );
+    }
+
+    #[test]
+    fn joined_segments_keep_sentence_spacing() {
+        // Mirrors the segment-join loop in transcribe_pcm_i16: Whisper hands back
+        // segments with leading spaces, and they must not be glued together.
+        let segments = [" Hello there.", " How are you?"];
+        let mut text = String::new();
+        for segment in segments {
+            let segment = segment.trim();
+            if segment.is_empty() {
+                continue;
+            }
+            if !text.is_empty() {
+                text.push(' ');
+            }
+            text.push_str(segment);
+        }
+        assert_eq!(text, "Hello there. How are you?");
     }
 
     #[test]
