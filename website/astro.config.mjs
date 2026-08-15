@@ -3,11 +3,10 @@ import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 import mdx from "@astrojs/mdx";
 
-// `site` + `base` drive canonical URLs, the sitemap, and every absolute OG/JSON-LD URL.
-// Project Pages live at https://<owner>.github.io/<repo>, so `base` must be the repo name.
+// `site` drives canonical URLs, the sitemap, and every absolute OG/JSON-LD URL.
+// Custom domain is voxflow.cachevector.com (CNAME to cachevector.github.io).
 export default defineConfig({
-  site: "https://cachevector.github.io",
-  base: "/voxflow",
+  site: "https://voxflow.cachevector.com",
   trailingSlash: "never",
   integrations: [mdx(), sitemap()],
   build: { inlineStylesheets: "auto" },

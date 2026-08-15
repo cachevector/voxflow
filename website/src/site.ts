@@ -4,7 +4,7 @@ export const SITE = {
   tagline: "Speak anywhere. VoxFlow writes it for you.",
   description:
     "VoxFlow is a BYOK voice dictation app for macOS. Hold Option+Ctrl, speak, and get clean text at your cursor — local Whisper transcription, an AI cleanup pass, and no subscription.",
-  url: "https://cachevector.github.io/voxflow",
+  url: "https://voxflow.cachevector.com",
   repo: "https://github.com/cachevector/voxflow",
   download: "https://github.com/cachevector/voxflow/releases/latest/download/VoxFlow-macos-arm64.dmg",
   releases: "https://github.com/cachevector/voxflow/releases/latest",
@@ -33,7 +33,7 @@ export const NAV = [
 ] as const;
 
 /**
- * Prefix an in-site path with the Astro `base` (required on GitHub project Pages).
+ * Prefix an in-site path with the Astro `base` when one is set.
  * Absolute http(s) URLs and bare hashes are left alone.
  */
 export function withBase(href: string): string {

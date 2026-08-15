@@ -12,9 +12,9 @@
 </p>
 
 <p align="center">
-  <a href="https://cachevector.github.io/voxflow">cachevector.github.io/voxflow</a>
+  <a href="https://voxflow.cachevector.com">voxflow.cachevector.com</a>
   &nbsp;|&nbsp;
-  <a href="https://cachevector.github.io/voxflow/docs">Docs</a>
+  <a href="https://voxflow.cachevector.com/docs">Docs</a>
 </p>
 
 VoxFlow is voice dictation for macOS that feels like part of the OS. Whisper transcribes on your machine. An AI pass turns the rambling into a sentence. The result is pasted where you were already typing.
@@ -75,7 +75,7 @@ macOS 13+, Apple Silicon.
 
 A browser-downloaded DMG is quarantined until the release is notarized. On this Mac, `pnpm tauri build` still produces an app you can open directly.
 
-Need Linux notes, provider setup, or a source build? Start at [the docs](https://cachevector.github.io/voxflow/docs) or [docs/macos-setup.md](docs/macos-setup.md).
+Need Linux notes, provider setup, or a source build? Start at [the docs](https://voxflow.cachevector.com/docs) or [docs/macos-setup.md](docs/macos-setup.md).
 
 ## License
 

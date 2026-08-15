@@ -18,7 +18,6 @@ const { title, description, bare = false, type = "website", noindex = false, sch
 const fullTitle = bare ? title : `${title} — ${SITE.name}`;
 // Trailing slash stripped, including on "/", so canonicals match the sitemap
 // entries @astrojs/sitemap emits for a trailingSlash: "never" site.
-// Pathname already includes the GitHub Pages base (`/voxflow/...`).
 const origin = new URL(SITE.url).origin;
 const canonical = new URL(Astro.url.pathname, origin).href.replace(/\/$/, "");
 const ogImage = `${SITE.url}${SITE.ogImage.startsWith("/") ? SITE.ogImage : `/${SITE.ogImage}`}`;

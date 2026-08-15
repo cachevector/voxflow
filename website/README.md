@@ -1,7 +1,7 @@
 # VoxFlow website
 
 Marketing site and documentation for VoxFlow, built with [Astro](https://astro.build).
-Deployed to GitHub Pages at [cachevector.github.io/voxflow](https://cachevector.github.io/voxflow).
+Deployed to GitHub Pages at [voxflow.cachevector.com](https://voxflow.cachevector.com).
 
 This is a standalone project — it has its own `package.json` and lockfile and is not part of
 the root pnpm workspace or the Tauri app's build.
@@ -57,8 +57,8 @@ generated from that.
 
 ## SEO
 
-- `site` and `base` in `astro.config.mjs` drive canonical URLs, the sitemap, and absolute
-  OG URLs. GitHub project Pages serve the site at `/voxflow`, so `base` is `/voxflow`.
+- `site` in `astro.config.mjs` drives canonical URLs, the sitemap, and absolute OG URLs.
+  The custom domain is `voxflow.cachevector.com` (CNAME in `public/CNAME`).
   Push to `master` (or run the **GitHub Pages** workflow) to publish.
 - `src/components/Seo.astro` emits title, description, canonical, robots, Open Graph, and
   Twitter card tags for every page.

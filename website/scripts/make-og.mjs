@@ -60,7 +60,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" v
   ${wave}
 
   <text x="100" y="602" font-family="Menlo, Courier New, monospace" font-size="19" fill="#64798a" letter-spacing="1.4">⌥ ⌃  HOLD · SPEAK · RELEASE</text>
-  <text x="1100" y="602" text-anchor="end" font-family="Menlo, Courier New, monospace" font-size="19" fill="#64798a" letter-spacing="1.4">cachevector.github.io/voxflow</text>
+  <text x="1100" y="602" text-anchor="end" font-family="Menlo, Courier New, monospace" font-size="19" fill="#64798a" letter-spacing="1.4">voxflow.cachevector.com</text>
 </svg>`;
 
 await mkdir(join(root, "public"), { recursive: true });
