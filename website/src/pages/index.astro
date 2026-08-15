@@ -96,7 +96,7 @@ const faqs = [
   },
   {
     q: "Is VoxFlow a subscription?",
-    a: "No. VoxFlow is BYOK — you connect your own provider key and pay that provider directly for what you use. There is no VoxFlow subscription to transcribe your speech.",
+    a: "No. The app is free. There is no VoxFlow subscription and no account. If you send the rewrite pass to Groq or OpenAI, you pay that provider directly for what you use.",
   },
   {
     q: "Which apps does it work in?",
@@ -112,7 +112,7 @@ const faqs = [
   },
   {
     q: "How is this different from Wispr Flow?",
-    a: "Same idea, different economics and privacy model. VoxFlow transcribes on device, stores your keys in the Keychain, keeps history in a local SQLite file, and runs on your own provider key instead of a monthly subscription.",
+    a: "Same idea, different economics. VoxFlow is free. Transcription stays on your Mac, keys live in the Keychain, and you pay a provider only if you choose to. Wispr Flow charges a monthly subscription for the minutes.",
   },
 ];
 
@@ -141,7 +141,7 @@ const schema = [
       "@type": "Offer",
       price: "0",
       priceCurrency: "USD",
-      description: "Free and MIT licensed. Bring your own provider key.",
+      description: "Free and MIT licensed. No VoxFlow subscription. Bring your own provider key if you want a rewrite pass.",
     },
     author: { "@type": "Organization", name: SITE.studio, url: SITE.studioUrl },
   },
@@ -278,28 +278,42 @@ const schema = [
 
   <!-- ── Pricing ──────────────────────────────────────── -->
   <section id="pricing" class="band">
-    <div class="wrap">
-      <header class="section-head">
+    <div class="wrap price-block">
+      <header class="section-head section-head--center">
         <p class="eyebrow">Pricing</p>
-        <h2>Pay for the app once, if at all. Never for the minutes.</h2>
+        <h2>The app is free.</h2>
         <p class="section-sub">
-          VoxFlow is open source and free to build today. The plan is to keep local
-          transcription, one provider, and the hotkey free forever, and to charge a single
-          lifetime price for the power-user layer — multiple providers, per-app profiles,
-          custom commands, the cost dashboard, snippets and vocabulary.
+          Never for the minutes. No account. MIT licensed. You only pay a provider
+          if you turn the rewrite pass on and point it at one.
         </p>
       </header>
-      <p class="fineprint">
-        No subscription for transcription. You bring the key; you pay your provider directly
-        for exactly what you use.
-      </p>
+
+      <p class="price-hero mono">$0</p>
+      <p class="price-hero-note">what VoxFlow charges. Forever.</p>
+
+      <div class="price-split">
+        <article>
+          <h3>Included</h3>
+          <p>
+            Local Whisper, the hotkey, the overlay, rewrite, history, as many
+            providers as you want. The whole app.
+          </p>
+        </article>
+        <article>
+          <h3>You may still pay</h3>
+          <p>
+            Only Groq, OpenAI, or a server you run, and only if you send text
+            there. Turn rewrite off and nothing leaves the machine.
+          </p>
+        </article>
+      </div>
     </div>
   </section>
 
   <!-- ── FAQ ──────────────────────────────────────────── -->
   <section id="faq" class="band band--tint">
-    <div class="wrap">
-      <header class="section-head">
+    <div class="wrap faq-block">
+      <header class="section-head section-head--center">
         <p class="eyebrow">Questions</p>
         <h2>The things people ask first.</h2>
       </header>
@@ -387,6 +401,11 @@ const schema = [
   .section-head h2 {
     font-size: clamp(1.75rem, 3.6vw, 2.6rem);
     margin-top: 0.75rem;
+  }
+  .section-head--center {
+    text-align: center;
+    margin-inline: auto;
+    max-width: 46ch;
   }
   .section-sub {
     margin-top: 1rem;
@@ -521,10 +540,56 @@ const schema = [
     background: var(--signal-dim);
   }
 
+  /* ── pricing ── */
+  .price-block { text-align: center; }
+  .price-hero {
+    margin: 0.4rem 0 0;
+    font-size: clamp(4.4rem, 12vw, 7.2rem);
+    font-weight: 500;
+    letter-spacing: -0.06em;
+    line-height: 0.9;
+    color: var(--signal-bright);
+  }
+  .price-hero-note {
+    margin-top: 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .price-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    max-width: 760px;
+    margin: 2.6rem auto 0;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    text-align: left;
+  }
+  .price-split article {
+    background: var(--surface);
+    padding: 1.6rem 1.5rem 1.7rem;
+  }
+  .price-split h3 {
+    font-size: 1.02rem;
+    letter-spacing: -0.012em;
+  }
+  .price-split p {
+    margin-top: 0.55rem;
+    color: var(--text-muted);
+    font-size: 0.94rem;
+  }
+
   /* ── faq ── */
+  .faq-block .section-head { margin-bottom: 2.2rem; }
   .faq {
     border-top: 1px solid var(--line-soft);
-    max-width: 74ch;
+    max-width: 68ch;
+    margin-inline: auto;
   }
   details { border-bottom: 1px solid var(--line-soft); }
   summary {
@@ -567,5 +632,6 @@ const schema = [
   @media (max-width: 780px) {
     .privacy { grid-template-columns: 1fr; }
     .stage { grid-template-columns: 52px 1fr; gap: 1rem; }
+    .price-split { grid-template-columns: 1fr; }
   }
 </style>
