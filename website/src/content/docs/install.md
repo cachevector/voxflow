@@ -21,9 +21,13 @@ compiler.
 macOS 13 or later. Apple Silicon is what the release build targets, so Whisper
 can use Metal.
 
-If macOS says the app cannot be opened because it is from an unidentified
-developer, right-click VoxFlow in Applications, choose **Open**, then confirm.
-That prompt goes away once the release is notarized with a Developer ID.
+A DMG downloaded from the browser is quarantined. Until the release is
+notarized with a Developer ID, macOS may refuse to open it. Use the app
+produced by `pnpm tauri build` on this Mac, or clear the quarantine:
+
+```bash
+xattr -cr /Applications/VoxFlow.app
+```
 
 ## First run
 

@@ -73,7 +73,7 @@ macOS 13+, Apple Silicon.
 4. Grant Microphone and Accessibility when macOS asks.
 5. Focus a text field. Hold **Option+Ctrl**. Talk.
 
-If macOS blocks the first open, right-click VoxFlow, choose Open, and confirm.
+A browser-downloaded DMG is quarantined until the release is notarized. On this Mac, `pnpm tauri build` still produces an app you can open directly.
 
 Need Linux notes, provider setup, or a source build? Start at [the docs](https://cachevector.github.io/voxflow/docs) or [docs/macos-setup.md](docs/macos-setup.md).
 

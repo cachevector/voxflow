@@ -56,7 +56,7 @@
     "shortDescription": "Voice dictation for macOS. Hold a hotkey, speak, and cleaned text lands at the cursor.",
     "macOS": {
       "minimumSystemVersion": "13.0",
-      "signingIdentity": "-",
+      "signingIdentity": "Apple Development: aftaab2507@gmail.com (FC84RQ83VB)",
       "entitlements": "entitlements.plist"
     },
     "icon": [
