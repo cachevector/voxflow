@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    .frame {
+      padding: 72px 64px 56px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .brand { margin-bottom: 8px; }
+    .brand .name { font-size: 26px; }
+    .price {
+      margin-top: 56px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 168px;
+      font-weight: 500;
+      letter-spacing: -0.07em;
+      line-height: 0.85;
+      color: var(--signal-bright);
+    }
+    h1 {
+      font-family: "Bricolage Grotesque", sans-serif;
+      font-weight: 700;
+      font-size: 64px;
+      letter-spacing: -0.036em;
+      margin-top: 18px;
+    }
+    .lede {
+      margin-top: 16px;
+      font-size: 22px;
+      color: var(--muted);
+      max-width: 18ch;
+      line-height: 1.4;
+    }
+    .pill {
+      margin-top: 56px;
+      min-width: 360px;
+    }
+    .url {
+      margin-top: auto;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 16px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="brand">
+      <img src="../logo.png" alt="" />
+      <span class="name">VoxFlow</span>
+    </div>
+
+    <p class="price">$0</p>
+    <h1>The app is free.</h1>
+    <p class="lede">Never for the minutes. Your key, or fully local.</p>
+
+    <div class="pill">
+      <svg class="mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <rect x="9" y="2" width="6" height="11" rx="3" fill="currentColor" stroke="none" />
+        <path d="M6 11.5v.5a6 6 0 0 0 12 0v-.5" />
+        <path d="M12 19.5V22" />
+      </svg>
+      <span class="wave" aria-hidden="true">
+        <i style="height:6px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:22px"></i>
+        <i style="height:18px"></i><i style="height:26px"></i><i style="height:20px"></i><i style="height:14px"></i>
+        <i style="height:24px"></i><i style="height:12px"></i><i style="height:8px"></i>
+      </span>
+      <span class="label">Listening</span>
+      <span class="timer">0:04</span>
+    </div>
+
+    <p class="url">voxflow.cachevector.com</p>
+  </div>
+</body>
+</html>

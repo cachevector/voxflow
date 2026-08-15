@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    .frame { padding: 64px 80px 48px; display: flex; flex-direction: column; }
+    .brand .name { font-size: 28px; }
+    h1 {
+      font-family: "Bricolage Grotesque", sans-serif;
+      font-weight: 700;
+      font-size: 84px;
+      line-height: 0.98;
+      letter-spacing: -0.036em;
+      margin-top: 56px;
+      text-align: center;
+    }
+    .lede {
+      margin: 22px auto 0;
+      font-size: 24px;
+      color: var(--muted);
+      max-width: 34ch;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      margin-top: 48px;
+      flex: 1;
+      align-content: center;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      padding: 36px 32px 40px;
+    }
+    .card .kicker {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--signal-bright);
+    }
+    .card h2 {
+      font-family: "Bricolage Grotesque", sans-serif;
+      font-size: 34px;
+      letter-spacing: -0.03em;
+      margin-top: 18px;
+    }
+    .card p {
+      margin-top: 14px;
+      font-size: 20px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .foot { margin-top: auto; padding-top: 40px; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="brand">
+      <img src="../logo.png" alt="" />
+      <span class="name">VoxFlow</span>
+      <span class="plat">macOS</span>
+    </div>
+
+    <h1>Your voice stays home.</h1>
+    <p class="lede">Whisper runs on the Mac. The rewrite pass is optional. There is no VoxFlow account.</p>
+
+    <div class="cards">
+      <article class="card">
+        <p class="kicker">transcribe</p>
+        <h2>On device</h2>
+        <p>Audio never leaves the machine. whisper.cpp with Metal. No upload, no telemetry.</p>
+      </article>
+      <article class="card">
+        <p class="kicker">rewrite</p>
+        <h2>Your key</h2>
+        <p>Groq, OpenAI, or a server you run. Keys live in the Keychain. Or turn the pass off.</p>
+      </article>
+      <article class="card">
+        <p class="kicker">price</p>
+        <h2>Free</h2>
+        <p>The app is free. You only pay a provider if you send text there.</p>
+      </article>
+    </div>
+
+    <div class="foot">
+      <span>hold · speak · release</span>
+      <span>voxflow.cachevector.com</span>
+    </div>
+  </div>
+</body>
+</html>
