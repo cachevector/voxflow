@@ -41,6 +41,7 @@ export interface PrivacyConfig {
   save_history: boolean;
   auto_delete_days: number | null;
   never_save_audio: boolean;
+  learn_from_manual_edits: boolean;
   sensitive_app_blocklist: string[];
 }
 
@@ -59,6 +60,16 @@ export interface Snippet {
 export interface DictionaryEntry {
   term: string;
   replacement: string | null;
+}
+
+export interface VocabularySuggestionDismissal {
+  term: string;
+  replacement: string;
+}
+
+export interface VocabularySuggestion {
+  term: string;
+  replacement: string;
 }
 
 export interface RewriteCommand {
@@ -95,6 +106,7 @@ export interface Settings {
   app_profiles: AppProfile[];
   snippets: Snippet[];
   dictionary: DictionaryEntry[];
+  vocabulary_suggestion_dismissals: VocabularySuggestionDismissal[];
   rewrite_commands: RewriteCommand[];
   history_limit_free: number;
 }
@@ -151,6 +163,11 @@ export interface HistoryEntry {
   duration_billable_secs: number;
   active_app_id: string | null;
   estimated_usd: number;
+}
+
+export interface HistoryCorrectionResult {
+  entry: HistoryEntry;
+  suggestion: VocabularySuggestion | null;
 }
 
 export interface AudioDeviceInfo {

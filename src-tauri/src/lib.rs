@@ -1,4 +1,6 @@
 mod commands;
+mod edit_learning;
+mod edit_learning_shortcuts;
 mod events;
 mod hotkey_listener;
 mod state;
@@ -27,6 +29,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let settings = voxflow_config::load_settings().unwrap_or_default();
             if let Some(legacy_key) = voxflow_config::legacy_plaintext_openai_key() {
@@ -43,6 +46,8 @@ pub fn run() {
             );
             app.manage(AppState {
                 engine: engine.clone(),
+                edit_learning_suggestion: parking_lot::Mutex::new(None),
+                edit_learning_revision: std::sync::atomic::AtomicU64::new(0),
             });
 
             if let Err(e) = engine.prewarm() {
@@ -63,9 +68,15 @@ pub fn run() {
             commands::history::list_history,
             commands::history::export_history_json,
             commands::history::export_history_csv,
+            commands::history::correct_history_entry,
+            commands::history::accept_vocabulary_suggestion,
+            commands::history::dismiss_vocabulary_suggestion,
+            commands::history::restore_vocabulary_suggestion,
+            commands::history::respond_to_edit_learning_suggestion,
             commands::audio::list_audio_devices,
             commands::permissions::get_permission_status,
             commands::permissions::open_accessibility_settings,
+            commands::permissions::open_input_monitoring_settings,
             commands::permissions::paste_text,
             commands::permissions::whisper_model_ready,
             commands::permissions::download_whisper_model,

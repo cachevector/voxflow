@@ -2,11 +2,14 @@ use crate::events::{DictationState, StateEvent};
 use crate::latency::LatencyTracker;
 use anyhow::{Context, Result};
 use chrono::Datelike;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use voxflow_audio::AudioCapture;
-use voxflow_config::{OutputMode, ProviderConfig, Settings};
+use voxflow_config::{
+    DictionaryEntry, OutputMode, ProviderConfig, Settings, VocabularySuggestionDismissal,
+};
 use voxflow_cost::{build_dashboard, cap_reached, MonthlyUsage, UsageRecord};
 use voxflow_history::{new_entry, HistoryStore};
 use voxflow_insert::{InsertResult, InsertionBridge};
@@ -22,6 +25,19 @@ pub struct DictationResult {
     pub state: DictationState,
     pub insert_result: Option<InsertResult>,
     pub latency_ms: u64,
+}
+
+/// An exact phrase replacement inferred from a small, intentional history edit.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VocabularySuggestion {
+    pub term: String,
+    pub replacement: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryCorrectionResult {
+    pub entry: voxflow_history::HistoryEntry,
+    pub suggestion: Option<VocabularySuggestion>,
 }
 
 pub struct DictationPipeline {
@@ -238,6 +254,10 @@ impl DictationPipeline {
             }
         }
 
+        // The rewrite model is given vocabulary context, but a confirmed exact
+        // user replacement must win if the model changes it back.
+        transcript_text = apply_dictionary(&transcript_text, &settings.dictionary);
+
         // Final sentence-level cleanup: capitalization, terminal punctuation,
         // question detection, and a trailing space between dictations. Runs
         // after the (optional) AI rewrite so it also cleans up local-only output
@@ -332,6 +352,176 @@ impl DictationPipeline {
         Ok(())
     }
 
+    pub async fn correct_history_entry(
+        &mut self,
+        id: &str,
+        corrected_text: &str,
+    ) -> Result<HistoryCorrectionResult> {
+        let corrected_text = corrected_text.trim();
+        if corrected_text.is_empty() {
+            anyhow::bail!("corrected text cannot be empty");
+        }
+
+        let entry = self
+            .history
+            .get(id)?
+            .ok_or_else(|| anyhow::anyhow!("history entry not found"))?;
+        let settings = self.settings.read().await.clone();
+        let suggestion = vocabulary_suggestion(&entry.text, corrected_text).filter(|candidate| {
+            !settings.dictionary.iter().any(|entry| {
+                entry.term.eq_ignore_ascii_case(&candidate.term)
+                    && entry
+                        .replacement
+                        .as_deref()
+                        .is_some_and(|value| value.eq_ignore_ascii_case(&candidate.replacement))
+            }) && !settings
+                .vocabulary_suggestion_dismissals
+                .iter()
+                .any(|dismissal| {
+                    dismissal.term.eq_ignore_ascii_case(&candidate.term)
+                        && dismissal
+                            .replacement
+                            .eq_ignore_ascii_case(&candidate.replacement)
+                })
+        });
+        self.history.update_text(id, corrected_text)?;
+        self.inserter
+            .copy_only(corrected_text)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+        Ok(HistoryCorrectionResult {
+            entry: voxflow_history::HistoryEntry {
+                text: corrected_text.to_string(),
+                ..entry
+            },
+            suggestion,
+        })
+    }
+
+    /// Returns a vocabulary suggestion for an externally observed, short-lived
+    /// edit session. The caller owns the platform-specific observation; core
+    /// only applies the same conservative eligibility and suppression rules as
+    /// the History correction flow.
+    pub async fn vocabulary_suggestion_for_edit(
+        &self,
+        original: &str,
+        corrected: &str,
+    ) -> Option<VocabularySuggestion> {
+        let settings = self.settings.read().await;
+        vocabulary_suggestion(original, corrected).filter(|candidate| {
+            !settings.dictionary.iter().any(|entry| {
+                entry.term.eq_ignore_ascii_case(&candidate.term)
+                    && entry
+                        .replacement
+                        .as_deref()
+                        .is_some_and(|value| value.eq_ignore_ascii_case(&candidate.replacement))
+            }) && !settings
+                .vocabulary_suggestion_dismissals
+                .iter()
+                .any(|dismissal| {
+                    dismissal.term.eq_ignore_ascii_case(&candidate.term)
+                        && dismissal
+                            .replacement
+                            .eq_ignore_ascii_case(&candidate.replacement)
+                })
+        })
+    }
+
+    pub async fn accept_vocabulary_suggestion(
+        &mut self,
+        suggestion: VocabularySuggestion,
+    ) -> Result<()> {
+        let term = suggestion.term.trim();
+        let replacement = suggestion.replacement.trim();
+        if !is_valid_vocabulary_phrase(term) || !is_valid_vocabulary_phrase(replacement) {
+            anyhow::bail!("invalid vocabulary suggestion");
+        }
+
+        let mut settings = self.settings.read().await.clone();
+        let duplicate = settings.dictionary.iter().any(|entry| {
+            entry.term.eq_ignore_ascii_case(term)
+                && entry
+                    .replacement
+                    .as_deref()
+                    .is_some_and(|value| value.eq_ignore_ascii_case(replacement))
+        });
+        if !duplicate {
+            settings.dictionary.push(DictionaryEntry {
+                term: term.to_string(),
+                replacement: Some(replacement.to_string()),
+            });
+        }
+        settings
+            .vocabulary_suggestion_dismissals
+            .retain(|dismissal| {
+                !(dismissal.term.eq_ignore_ascii_case(term)
+                    && dismissal.replacement.eq_ignore_ascii_case(replacement))
+            });
+        voxflow_config::save_settings(&settings)?;
+        *self.settings.write().await = settings;
+        Ok(())
+    }
+
+    pub async fn dismiss_vocabulary_suggestion(
+        &mut self,
+        suggestion: VocabularySuggestion,
+    ) -> Result<()> {
+        let term = suggestion.term.trim();
+        let replacement = suggestion.replacement.trim();
+        if term.is_empty() || replacement.is_empty() {
+            anyhow::bail!("invalid vocabulary suggestion");
+        }
+
+        let mut settings = self.settings.read().await.clone();
+        let exists = settings
+            .vocabulary_suggestion_dismissals
+            .iter()
+            .any(|dismissal| {
+                dismissal.term.eq_ignore_ascii_case(term)
+                    && dismissal.replacement.eq_ignore_ascii_case(replacement)
+            });
+        if !exists {
+            settings
+                .vocabulary_suggestion_dismissals
+                .push(VocabularySuggestionDismissal {
+                    term: term.to_string(),
+                    replacement: replacement.to_string(),
+                });
+            // Retain the most recent dismissals without letting a settings file
+            // grow unbounded from one-off edits.
+            const MAX_DISMISSALS: usize = 100;
+            if settings.vocabulary_suggestion_dismissals.len() > MAX_DISMISSALS {
+                let excess = settings.vocabulary_suggestion_dismissals.len() - MAX_DISMISSALS;
+                settings.vocabulary_suggestion_dismissals.drain(0..excess);
+            }
+            voxflow_config::save_settings(&settings)?;
+            *self.settings.write().await = settings;
+        }
+        Ok(())
+    }
+
+    pub async fn restore_vocabulary_suggestion(
+        &mut self,
+        suggestion: VocabularySuggestion,
+    ) -> Result<()> {
+        let mut settings = self.settings.read().await.clone();
+        let before = settings.vocabulary_suggestion_dismissals.len();
+        settings
+            .vocabulary_suggestion_dismissals
+            .retain(|dismissal| {
+                !(dismissal.term.eq_ignore_ascii_case(&suggestion.term)
+                    && dismissal
+                        .replacement
+                        .eq_ignore_ascii_case(&suggestion.replacement))
+            });
+        if settings.vocabulary_suggestion_dismissals.len() != before {
+            voxflow_config::save_settings(&settings)?;
+            *self.settings.write().await = settings;
+        }
+        Ok(())
+    }
+
     pub fn cost_dashboard(&self, settings: &Settings) -> voxflow_cost::CostDashboard {
         build_dashboard(
             &self.monthly_usage,
@@ -369,5 +559,112 @@ impl DictationPipeline {
             .insert(text, settings.clipboard_restore)
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))
+    }
+}
+
+fn vocabulary_suggestion(original: &str, corrected: &str) -> Option<VocabularySuggestion> {
+    let original_words: Vec<&str> = original.split_whitespace().collect();
+    let corrected_words: Vec<&str> = corrected.split_whitespace().collect();
+    if original_words.is_empty() || corrected_words.is_empty() {
+        return None;
+    }
+
+    let mut prefix = 0;
+    while prefix < original_words.len()
+        && prefix < corrected_words.len()
+        && comparable_word(original_words[prefix]) == comparable_word(corrected_words[prefix])
+    {
+        prefix += 1;
+    }
+
+    let mut original_end = original_words.len();
+    let mut corrected_end = corrected_words.len();
+    while original_end > prefix
+        && corrected_end > prefix
+        && comparable_word(original_words[original_end - 1])
+            == comparable_word(corrected_words[corrected_end - 1])
+    {
+        original_end -= 1;
+        corrected_end -= 1;
+    }
+
+    let term = phrase_without_edge_punctuation(&original_words[prefix..original_end]);
+    let replacement = phrase_without_edge_punctuation(&corrected_words[prefix..corrected_end]);
+    // A complete multi-word rewrite has no unchanged context proving this was
+    // a spelling fix rather than normal editing. Only learn whole-utterance
+    // replacements when both sides are a single token.
+    let replaces_entire_utterance = prefix == 0
+        && original_end == original_words.len()
+        && corrected_end == corrected_words.len();
+    if !is_valid_vocabulary_phrase(&term)
+        || !is_valid_vocabulary_phrase(&replacement)
+        || comparable_word(&term) == comparable_word(&replacement)
+        || !looks_vocabulary_like(&term, &replacement)
+        || (replaces_entire_utterance && (original_words.len() != 1 || corrected_words.len() != 1))
+    {
+        return None;
+    }
+
+    Some(VocabularySuggestion { term, replacement })
+}
+
+fn comparable_word(word: &str) -> String {
+    word.trim_matches(|c: char| !c.is_alphanumeric())
+        .to_lowercase()
+}
+
+fn phrase_without_edge_punctuation(words: &[&str]) -> String {
+    words
+        .iter()
+        .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn is_valid_vocabulary_phrase(phrase: &str) -> bool {
+    let words: Vec<&str> = phrase.split_whitespace().collect();
+    !words.is_empty()
+        && words.len() <= 4
+        && phrase.chars().count() <= 48
+        && phrase
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' || c == '.')
+        && phrase.chars().any(|c| c.is_alphanumeric())
+}
+
+fn looks_vocabulary_like(term: &str, replacement: &str) -> bool {
+    term.chars()
+        .chain(replacement.chars())
+        .any(|c| c.is_uppercase() || c.is_ascii_digit() || matches!(c, '-' | '_' | '.'))
+}
+
+#[cfg(test)]
+mod correction_tests {
+    use super::*;
+
+    #[test]
+    fn suggests_a_small_distinctive_phrase_replacement() {
+        assert_eq!(
+            vocabulary_suggestion(
+                "I want to submit this app for Shipper10.",
+                "I want to submit this app for Shipaton."
+            ),
+            Some(VocabularySuggestion {
+                term: "Shipper10".into(),
+                replacement: "Shipaton".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn ignores_punctuation_and_sentence_rewrites() {
+        assert!(vocabulary_suggestion("Hello world", "Hello, world!").is_none());
+        assert!(vocabulary_suggestion("Ship it today", "Please submit this tomorrow").is_none());
+    }
+
+    #[test]
+    fn ignores_common_word_replacements() {
+        assert!(vocabulary_suggestion("I went home", "I go home").is_none());
     }
 }

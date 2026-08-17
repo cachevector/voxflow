@@ -137,6 +137,10 @@ pub struct PrivacyConfig {
     pub save_history: bool,
     pub auto_delete_days: Option<u32>,
     pub never_save_audio: bool,
+    /// Opt-in macOS feature: inspect only a just-inserted accessible text range
+    /// for a short time to offer a vocabulary correction.
+    #[serde(default)]
+    pub learn_from_manual_edits: bool,
     pub sensitive_app_blocklist: Vec<String>,
 }
 
@@ -146,9 +150,14 @@ impl Default for PrivacyConfig {
             save_history: true,
             auto_delete_days: Some(30),
             never_save_audio: true,
+            learn_from_manual_edits: false,
             sensitive_app_blocklist: vec![
                 "com.1password.1password".into(),
                 "com.apple.keychainaccess".into(),
+                "com.bitwarden.desktop".into(),
+                "com.lastpass.LastPass".into(),
+                "com.dashlane.dashlane".into(),
+                "com.enpass.osx".into(),
             ],
         }
     }
@@ -185,6 +194,15 @@ pub struct Snippet {
 pub struct DictionaryEntry {
     pub term: String,
     pub replacement: Option<String>,
+}
+
+/// A vocabulary suggestion the user declined after correcting a history item.
+/// Keeping these locally prevents the same correction from becoming a repeated
+/// interruption while still allowing a new spelling to be suggested later.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VocabularySuggestionDismissal {
+    pub term: String,
+    pub replacement: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,6 +281,8 @@ pub struct Settings {
     pub app_profiles: Vec<AppProfile>,
     pub snippets: Vec<Snippet>,
     pub dictionary: Vec<DictionaryEntry>,
+    #[serde(default)]
+    pub vocabulary_suggestion_dismissals: Vec<VocabularySuggestionDismissal>,
     pub rewrite_commands: Vec<RewriteCommand>,
     pub history_limit_free: u32,
 }
@@ -285,7 +305,7 @@ pub enum BarPosition {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            schema_version: 3,
+            schema_version: 5,
             quality_mode: QualityMode::Hybrid,
             dictation_mode: DictationMode::PushToTalk,
             hotkey: HotkeyConfig::default(),
@@ -308,6 +328,7 @@ impl Default for Settings {
             app_profiles: default_app_profiles(),
             snippets: Vec::new(),
             dictionary: Vec::new(),
+            vocabulary_suggestion_dismissals: Vec::new(),
             rewrite_commands: Vec::new(),
             history_limit_free: 50,
         }
@@ -389,6 +410,9 @@ pub fn load_settings() -> Result<Settings, ConfigError> {
 
     let data = fs::read_to_string(&path)?;
     let mut settings: Settings = serde_json::from_str(&data)?;
+    if settings.schema_version < 5 {
+        settings.schema_version = 5;
+    }
     if settings.rewrite_prompt.trim() == LEGACY_REWRITE_PROMPT {
         settings.rewrite_prompt = DEFAULT_REWRITE_PROMPT.to_string();
     }

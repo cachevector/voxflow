@@ -1,5 +1,7 @@
 use crate::events::{DictationState, StateEvent};
-use crate::pipeline::{DictationPipeline, DictationResult};
+use crate::pipeline::{
+    DictationPipeline, DictationResult, HistoryCorrectionResult, VocabularySuggestion,
+};
 use anyhow::Result;
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -88,6 +90,64 @@ impl DictationEngine {
 
     pub fn list_history(&self, limit: u32) -> Result<Vec<voxflow_history::HistoryEntry>> {
         self.block_on(async { self.pipeline.read().await.list_history(limit) })
+    }
+
+    pub fn vocabulary_suggestion_for_edit(
+        &self,
+        original: String,
+        corrected: String,
+    ) -> Option<VocabularySuggestion> {
+        self.block_on(async {
+            self.pipeline
+                .read()
+                .await
+                .vocabulary_suggestion_for_edit(&original, &corrected)
+                .await
+        })
+    }
+
+    pub fn correct_history_entry(
+        &self,
+        id: String,
+        corrected_text: String,
+    ) -> Result<HistoryCorrectionResult> {
+        self.block_on(async {
+            self.pipeline
+                .write()
+                .await
+                .correct_history_entry(&id, &corrected_text)
+                .await
+        })
+    }
+
+    pub fn accept_vocabulary_suggestion(&self, suggestion: VocabularySuggestion) -> Result<()> {
+        self.block_on(async {
+            self.pipeline
+                .write()
+                .await
+                .accept_vocabulary_suggestion(suggestion)
+                .await
+        })
+    }
+
+    pub fn dismiss_vocabulary_suggestion(&self, suggestion: VocabularySuggestion) -> Result<()> {
+        self.block_on(async {
+            self.pipeline
+                .write()
+                .await
+                .dismiss_vocabulary_suggestion(suggestion)
+                .await
+        })
+    }
+
+    pub fn restore_vocabulary_suggestion(&self, suggestion: VocabularySuggestion) -> Result<()> {
+        self.block_on(async {
+            self.pipeline
+                .write()
+                .await
+                .restore_vocabulary_suggestion(suggestion)
+                .await
+        })
     }
 
     pub fn export_history_json(&self, limit: u32) -> Result<String> {

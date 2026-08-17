@@ -119,6 +119,39 @@ impl HistoryStore {
             .map_err(HistoryError::from)
     }
 
+    pub fn get(&self, id: &str) -> Result<Option<HistoryEntry>, HistoryError> {
+        let conn = self.connect()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, text, created_at, provider, model, duration_raw_secs, duration_billable_secs, active_app_id, estimated_usd
+             FROM history WHERE id = ?1 LIMIT 1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+        Ok(Some(HistoryEntry {
+            id: row.get(0)?,
+            text: row.get(1)?,
+            created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(2)?)
+                .map(|d| d.with_timezone(&Utc))
+                .unwrap_or_else(|_| Utc::now()),
+            provider: row.get(3)?,
+            model: row.get(4)?,
+            duration_raw_secs: row.get(5)?,
+            duration_billable_secs: row.get(6)?,
+            active_app_id: row.get(7)?,
+            estimated_usd: row.get(8)?,
+        }))
+    }
+
+    pub fn update_text(&self, id: &str, text: &str) -> Result<bool, HistoryError> {
+        let conn = self.connect()?;
+        Ok(conn.execute(
+            "UPDATE history SET text = ?1 WHERE id = ?2",
+            params![text, id],
+        )? > 0)
+    }
+
     pub fn delete_older_than_days(&self, days: u32) -> Result<u64, HistoryError> {
         let conn = self.connect()?;
         let cutoff = Local::now() - chrono::Duration::days(days as i64);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { PageProps } from "../App";
 import { Section } from "../components/Field";
+import { commands } from "@/shared/tauri";
 
 export default function Dictionary({ settings, update }: PageProps) {
   const [term, setTerm] = useState("");
@@ -23,6 +24,34 @@ export default function Dictionary({ settings, update }: PageProps) {
   const remove = (index: number) => {
     update({ dictionary: settings.dictionary.filter((_, i) => i !== index) });
   };
+
+  const restoreSuggestion = async (term: string, replacement: string) => {
+    await commands.restoreVocabularySuggestion({ term, replacement });
+    update({
+      vocabulary_suggestion_dismissals: settings.vocabulary_suggestion_dismissals.filter(
+        (dismissal) =>
+          !(
+            dismissal.term.toLowerCase() === term.toLowerCase() &&
+            dismissal.replacement.toLowerCase() === replacement.toLowerCase()
+          ),
+      ),
+    });
+  };
+
+  const vocabularyGroups = settings.dictionary.reduce<
+    Array<{ preferred: string; entries: Array<{ index: number; term: string }> }>
+  >((groups, entry, index) => {
+    const preferred = entry.replacement ?? entry.term;
+    const group = groups.find(
+      (candidate) => candidate.preferred.toLowerCase() === preferred.toLowerCase(),
+    );
+    if (group) {
+      group.entries.push({ index, term: entry.term });
+    } else {
+      groups.push({ preferred, entries: [{ index, term: entry.term }] });
+    }
+    return groups;
+  }, []);
 
   return (
     <Section title="Vocabulary">
@@ -69,30 +98,61 @@ export default function Dictionary({ settings, update }: PageProps) {
         </p>
       ) : (
         <ul className="space-y-2">
-          {settings.dictionary.map((entry, i) => (
+          {vocabularyGroups.map((group) => (
             <li
-              key={`${entry.term}-${i}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
+              key={group.preferred}
+              className="rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
             >
-              <span>
-                <span className="font-medium">{entry.term}</span>
-                {entry.replacement && (
-                  <span className="text-neutral-500">
-                    {" "}
-                    → {entry.replacement}
+              <p className="font-medium">{group.preferred}</p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {group.entries.map((entry) => (
+                  <span
+                    key={`${entry.term}-${entry.index}`}
+                    className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-800"
+                  >
+                    {entry.term}
+                    <button
+                      type="button"
+                      onClick={() => remove(entry.index)}
+                      className="text-neutral-500 hover:text-red-500"
+                      aria-label={`Remove ${entry.term}`}
+                    >
+                      ×
+                    </button>
                   </span>
-                )}
-              </span>
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="text-xs text-neutral-500 hover:text-red-500"
-              >
-                Remove
-              </button>
+                ))}
+              </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {settings.vocabulary_suggestion_dismissals.length > 0 && (
+        <div className="mt-6">
+          <p className="text-sm font-medium">Dismissed suggestions</p>
+          <p className="mt-1 text-xs text-neutral-500">
+            Re-enable a suggestion if you want VoxFlow to offer it after a future correction.
+          </p>
+          <ul className="mt-2 space-y-2">
+            {settings.vocabulary_suggestion_dismissals.map((dismissal) => (
+              <li
+                key={`${dismissal.term}-${dismissal.replacement}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800"
+              >
+                <span>
+                  {dismissal.term} → {dismissal.replacement}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => restoreSuggestion(dismissal.term, dismissal.replacement)}
+                  className="text-accent"
+                >
+                  Re-enable
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </Section>
   );

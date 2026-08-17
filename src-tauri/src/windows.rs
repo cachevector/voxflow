@@ -15,7 +15,7 @@ pub fn show_overlay(app: &AppHandle) {
 fn position_overlay_bottom_center(app: &AppHandle, window: &tauri::WebviewWindow) {
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let work_area = monitor.work_area();
-        let overlay_size = window.outer_size().unwrap_or(PhysicalSize::new(360, 64));
+        let overlay_size = window.outer_size().unwrap_or(PhysicalSize::new(224, 64));
         let bottom_margin = (OVERLAY_BOTTOM_MARGIN * monitor.scale_factor()).round() as u32;
         let position = bottom_center_position(
             work_area.position,
@@ -51,8 +51,7 @@ pub fn hide_overlay(app: &AppHandle) {
     }
 }
 
-/// Hides the overlay after a short delay so "Done"/"Copied" states are
-/// visible for a beat before the pill disappears.
+/// Hides the overlay after a short delay so the transition out is smooth.
 pub fn hide_overlay_after(app: AppHandle, delay: Duration) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(delay).await;

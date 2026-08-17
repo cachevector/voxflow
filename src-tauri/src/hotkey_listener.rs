@@ -113,12 +113,30 @@ fn stop_dictation(app: &AppHandle) {
 
     let app_state = app.state::<AppState>();
     match app_state.engine.on_hotkey_up(None) {
-        Ok(_) => {
+        Ok(result) => {
+            let privacy = app_state.engine.get_settings().privacy;
+            if privacy.learn_from_manual_edits
+                && result
+                    .insert_result
+                    .as_ref()
+                    .is_some_and(|insert| insert.success)
+            {
+                crate::edit_learning::begin(
+                    app.clone(),
+                    result.text,
+                    privacy.sensitive_app_blocklist,
+                );
+            }
+            // Completion is an internal pipeline state. Do not flash a
+            // redundant "Done" pill after the user releases the hotkey; the
+            // overlay has already shown Transcribing while work was running.
             if let Some(event) = app_state.engine.last_event() {
-                events::emit_state(app, &event);
+                if event.state != voxflow_core::DictationState::Done {
+                    events::emit_state(app, &event);
+                }
             }
         }
         Err(e) => tracing::warn!("dictation failed: {e}"),
     }
-    windows::hide_overlay_after(app.clone(), Duration::from_millis(900));
+    windows::hide_overlay_after(app.clone(), Duration::from_millis(150));
 }

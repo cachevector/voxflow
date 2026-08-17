@@ -4,9 +4,13 @@ import { Row, Section, Select, Toggle } from "../components/Field";
 import { commands } from "@/shared/tauri";
 
 export default function General({ settings, update }: PageProps) {
-  const [perm, setPerm] = useState<{ accessibility_hint: string; microphone_hint: string } | null>(
-    null,
-  );
+  const [perm, setPerm] = useState<{
+    accessibility_hint: string;
+    accessibility_granted: boolean;
+    microphone_hint: string;
+    input_monitoring_hint: string;
+    input_monitoring_granted: boolean;
+  } | null>(null);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [downloading, setDownloading] = useState(false);
 
