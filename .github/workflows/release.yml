@@ -47,7 +47,7 @@ jobs:
 
             First launch: grant Microphone and Accessibility, then hold Option+Ctrl and speak.
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ github.ref_type == 'tag' && contains(github.ref_name, '-') }}
           args: --bundles dmg,app
       - name: Attach stable DMG name
         env:

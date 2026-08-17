@@ -150,7 +150,7 @@ impl DictationPipeline {
         let pcm_i16 = self
             .capture
             .as_ref()
-            .map(|c| c.take_utterance_pcm_i16())
+            .map(|c| c.take_utterance_pcm_i16_after_flush())
             .unwrap_or_default();
 
         // Whisper returns "[BLANK_AUDIO]" for anything at room-noise level, which

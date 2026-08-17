@@ -10,6 +10,11 @@ use tracing::warn;
 
 pub const TARGET_SAMPLE_RATE: u32 = 16_000;
 
+/// Audio callbacks can still be queued briefly after the hotkey release is
+/// observed. Keep the stream alive for this long before draining so the final
+/// syllables make it into the utterance.
+pub const CAPTURE_FLUSH_GRACE: std::time::Duration = std::time::Duration::from_millis(150);
+
 #[derive(Debug, Error)]
 pub enum AudioError {
     #[error("no input device available")]
@@ -182,6 +187,15 @@ impl AudioCapture {
             .iter()
             .map(|&s| (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
             .collect()
+    }
+
+    /// Finalize an utterance after allowing in-flight input callbacks to
+    /// append their last samples. This is intentionally separate from
+    /// `take_utterance_pcm_i16` so callers that need an immediate snapshot do
+    /// not inherit a timing delay.
+    pub fn take_utterance_pcm_i16_after_flush(&self) -> Vec<i16> {
+        thread::sleep(CAPTURE_FLUSH_GRACE);
+        self.take_utterance_pcm_i16()
     }
 }
 

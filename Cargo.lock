@@ -5633,7 +5633,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voxflow"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5666,7 +5666,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-audio"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "cpal",
@@ -5678,7 +5678,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-config"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "directories",
  "serde",
@@ -5688,7 +5688,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-core"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5714,7 +5714,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-cost"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "chrono",
  "serde",
@@ -5723,7 +5723,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-history"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5737,7 +5737,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-insert"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "arboard",
@@ -5752,7 +5752,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-platform"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "ashpd",
@@ -5772,7 +5772,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-provider"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "hound",
  "reqwest 0.12.28",
@@ -5786,7 +5786,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-router"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "serde",
  "thiserror 2.0.18",
@@ -5797,7 +5797,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-secrets"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "keyring",
  "thiserror 2.0.18",
@@ -5805,7 +5805,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-vad"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "thiserror 2.0.18",
@@ -5815,7 +5815,7 @@ dependencies = [
 
 [[package]]
 name = "voxflow-whisper"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "hound",
@@ -5831,7 +5831,7 @@ dependencies = [
 
 [[package]]
 name = "voxflowctl"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "anyhow",
  "rpassword",
