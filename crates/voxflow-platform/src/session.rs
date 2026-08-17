@@ -84,8 +84,8 @@ fn detect_linux_session(
     wayland_display: Option<&str>,
     current_desktop: Option<&str>,
 ) -> DesktopSession {
-    let is_wayland = session_type == Some("wayland")
-        || wayland_display.is_some_and(|v| !v.is_empty());
+    let is_wayland =
+        session_type == Some("wayland") || wayland_display.is_some_and(|v| !v.is_empty());
 
     if is_wayland {
         let compositor = current_desktop

@@ -103,7 +103,8 @@ impl DictationEngine {
     }
 
     pub fn whisper_model_ready(&self) -> bool {
-        let id = self.block_on(async { self.pipeline.read().await.settings().await.whisper.model_id });
+        let id =
+            self.block_on(async { self.pipeline.read().await.settings().await.whisper.model_id });
         voxflow_whisper::model_exists(&id)
     }
 }

@@ -1,25 +1,24 @@
 mod hotkey;
-mod manual_binding;
-mod session;
-#[cfg(target_os = "linux")]
-mod portal_hotkey;
-#[cfg(target_os = "linux")]
-mod x11_hotkey;
 #[cfg(target_os = "macos")]
 mod macos_modifier_hotkey;
+mod manual_binding;
+#[cfg(target_os = "linux")]
+mod portal_hotkey;
+mod session;
+#[cfg(target_os = "linux")]
+mod x11_hotkey;
 
 pub use hotkey::{
-    AutostartBackend, Code, GlobalHotkeyBackend, HotkeyBinding, HotkeyError, HotkeyEvent,
-    Modifiers,
+    AutostartBackend, Code, GlobalHotkeyBackend, HotkeyBinding, HotkeyError, HotkeyEvent, Modifiers,
 };
-pub use manual_binding::ManualBindingHotkey;
-pub use session::{detect_session, DesktopSession, WaylandCompositor};
-#[cfg(target_os = "linux")]
-pub use portal_hotkey::PortalHotkey;
-#[cfg(target_os = "linux")]
-pub use x11_hotkey::X11Hotkey;
 #[cfg(target_os = "macos")]
 pub use macos_modifier_hotkey::MacModifierHotkey;
+pub use manual_binding::ManualBindingHotkey;
+#[cfg(target_os = "linux")]
+pub use portal_hotkey::PortalHotkey;
+pub use session::{detect_session, DesktopSession, WaylandCompositor};
+#[cfg(target_os = "linux")]
+pub use x11_hotkey::X11Hotkey;
 
 /// Pick the best hotkey backend for the current OS/session.
 pub fn default_hotkey_backend() -> Result<Box<dyn GlobalHotkeyBackend>, HotkeyError> {

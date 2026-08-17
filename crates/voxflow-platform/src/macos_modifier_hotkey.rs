@@ -4,8 +4,8 @@ use crate::hotkey::{GlobalHotkeyBackend, HotkeyBinding, HotkeyError, HotkeyEvent
 use async_trait::async_trait;
 use core_foundation::runloop::CFRunLoop;
 use core_graphics::event::{
-    CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
-    CGEventFlags,
+    CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
+    CGEventType,
 };
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -109,10 +109,9 @@ fn run_event_tap(tx: async_channel::Sender<HotkeyEvent>, active: Arc<AtomicBool>
         .create_runloop_source(0)
         .expect("runloop source");
     let run_loop = CFRunLoop::get_current();
-    run_loop.add_source(
-        &loop_source,
-        unsafe { core_foundation::runloop::kCFRunLoopCommonModes },
-    );
+    run_loop.add_source(&loop_source, unsafe {
+        core_foundation::runloop::kCFRunLoopCommonModes
+    });
     tap.enable();
     CFRunLoop::run_current();
 }

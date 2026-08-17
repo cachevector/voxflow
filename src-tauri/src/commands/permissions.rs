@@ -36,10 +36,7 @@ pub fn open_accessibility_settings(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn paste_text(app: AppHandle, text: String) -> Result<voxflow_insert::InsertResult, String> {
     let state = app.state::<AppState>();
-    state
-        .engine
-        .paste_text(text)
-        .map_err(|e| e.to_string())
+    state.engine.paste_text(text).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

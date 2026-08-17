@@ -7,13 +7,18 @@ export default function AIRewrite({ settings, update }: PageProps) {
     <Section title="AI Rewrite">
       <Row
         label="Rewrite every transcript"
-        hint="On by default — turns rough speech into a clean, well-formed sentence"
+        hint="On by default — grammar, fillers, and technical-term repair (LeetCode, handoff, …)"
       >
         <Toggle checked={settings.rewrite_enabled} onChange={(v) => update({ rewrite_enabled: v })} />
       </Row>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Rewrite prompt</label>
+        <label className="mb-1 block text-sm font-medium">
+          Rewrite prompt
+          <span className="ml-2 font-normal text-neutral-500">
+            Technical vocabulary is always appended, even if you customize this.
+          </span>
+        </label>
         <textarea
           value={settings.rewrite_prompt}
           onChange={(e) => update({ rewrite_prompt: e.target.value })}

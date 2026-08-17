@@ -15,6 +15,7 @@ export default function Transcription({ settings, update }: PageProps) {
           <option value="tiny.en">tiny.en (fastest)</option>
           <option value="base.en">base.en</option>
           <option value="small.en">small.en (recommended)</option>
+          <option value="medium.en">medium.en (more accurate, ~1.5GB)</option>
         </select>
       </Row>
       <Row label="Prewarm on launch" hint="Load the model at startup for lower first-dictation latency.">
@@ -27,7 +28,8 @@ export default function Transcription({ settings, update }: PageProps) {
       </Row>
       <p className="text-xs text-neutral-500">
         Speech-to-text runs locally via whisper.cpp (Metal on Apple Silicon). The model downloads
-        on first use (~500MB for small.en).
+        on first use (~500MB for small.en). Technical terms are biased via a vocabulary prompt;
+        add personal names under Vocabulary.
       </p>
     </Section>
   );

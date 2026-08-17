@@ -12,6 +12,7 @@ import PerAppProfiles from "./pages/PerAppProfiles";
 import Privacy from "./pages/Privacy";
 import Advanced from "./pages/Advanced";
 import History from "./pages/History";
+import Dictionary from "./pages/Dictionary";
 
 const PAGES = [
   { id: "general", label: "General", Component: General },
@@ -19,6 +20,7 @@ const PAGES = [
   { id: "microphone", label: "Microphone", Component: Microphone },
   { id: "history", label: "History", Component: History },
   { id: "transcription", label: "Speech (Whisper)", Component: Transcription },
+  { id: "dictionary", label: "Vocabulary", Component: Dictionary },
   { id: "ai-rewrite", label: "AI Cleanup (Groq)", Component: AIRewrite },
   { id: "providers", label: "Providers", Component: Providers },
   { id: "cost-control", label: "Cost Control", Component: CostControl },

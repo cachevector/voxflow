@@ -41,7 +41,9 @@ pub fn run() {
             let engine = Arc::new(
                 DictationEngine::new(settings, inserter).expect("failed to start dictation engine"),
             );
-            app.manage(AppState { engine: engine.clone() });
+            app.manage(AppState {
+                engine: engine.clone(),
+            });
 
             if let Err(e) = engine.prewarm() {
                 tracing::warn!("prewarm failed (mic/model may download on first dictation): {e}");

@@ -5,10 +5,15 @@
 
 mod client;
 pub mod rewrite;
+pub mod vocab;
 
 pub use client::{OpenAiCompatibleClient, ProviderError};
 pub use rewrite::{
     apply_dictionary, apply_rules, apply_snippets, finalize_text, system_prompt_for_mode,
+};
+pub use vocab::{
+    apply_vocabulary, default_cleanup_prompt, rewrite_vocab_suffix, whisper_initial_prompt,
+    DEFAULT_CLEANUP_PROMPT, LEGACY_CLEANUP_PROMPT,
 };
 
 use serde::{Deserialize, Serialize};

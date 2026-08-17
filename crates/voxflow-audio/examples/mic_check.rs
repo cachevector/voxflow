@@ -9,7 +9,11 @@ use voxflow_audio::AudioCapture;
 fn main() -> Result<()> {
     println!("input devices:");
     for d in AudioCapture::list_devices()? {
-        println!("  {}{}", d.name, if d.is_default { "  (default)" } else { "" });
+        println!(
+            "  {}{}",
+            d.name,
+            if d.is_default { "  (default)" } else { "" }
+        );
     }
 
     let capture = AudioCapture::open(None)?;

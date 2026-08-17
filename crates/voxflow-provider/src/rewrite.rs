@@ -1,8 +1,9 @@
-use voxflow_config::OutputMode;
+use crate::vocab::{self, DEFAULT_CLEANUP_PROMPT, LEGACY_CLEANUP_PROMPT};
+use voxflow_config::{DictionaryEntry, OutputMode};
 
-/// Default system prompt for the Groq cleanup pass (grammar + filler removal only).
+/// Default system prompt for the Groq cleanup pass.
 pub fn default_cleanup_prompt() -> &'static str {
-    "You clean up dictated speech. Remove filler words and false starts (um, uh, hmm, er). Fix grammar, punctuation, and capitalization. Do NOT change meaning, add content, or rephrase for style. Return ONLY the corrected text with no quotes or markdown."
+    vocab::default_cleanup_prompt()
 }
 
 /// Cheap, local, rule-based normalization applied before the AI rewrite pass
@@ -116,11 +117,10 @@ fn is_question(text: &str) -> bool {
 
     // Contractions are matched on their stem ("isn't" -> "isn", "don't" -> "don").
     const OPENERS: &[&str] = &[
-        "who", "what", "when", "where", "why", "which", "whom", "whose", "how",
-        "is", "are", "am", "was", "were", "do", "does", "did", "can", "could",
-        "would", "should", "will", "shall", "may", "might", "have", "has", "had",
-        "isn", "aren", "wasn", "weren", "don", "doesn", "didn", "can", "couldn",
-        "wouldn", "shouldn", "won", "haven", "hasn", "hadn", "ain",
+        "who", "what", "when", "where", "why", "which", "whom", "whose", "how", "is", "are", "am",
+        "was", "were", "do", "does", "did", "can", "could", "would", "should", "will", "shall",
+        "may", "might", "have", "has", "had", "isn", "aren", "wasn", "weren", "don", "doesn",
+        "didn", "can", "couldn", "wouldn", "shouldn", "won", "haven", "hasn", "hadn", "ain",
     ];
 
     // Match on the part before any apostrophe so contractions resolve to their
@@ -130,11 +130,24 @@ fn is_question(text: &str) -> bool {
 }
 
 /// Builds the system prompt sent to the AI rewrite call, layering per-app
-/// output-mode guidance on top of the user's base rewrite prompt.
-pub fn system_prompt_for_mode(mode: OutputMode, base_prompt: &str) -> String {
+/// output-mode guidance and technical-vocabulary repair on top of the user's
+/// base rewrite prompt.
+pub fn system_prompt_for_mode(
+    mode: OutputMode,
+    base_prompt: &str,
+    dictionary: &[DictionaryEntry],
+) -> String {
+    // Old installs still have the grammar-only default saved. Swap it for the
+    // vocab-aware prompt so "Do NOT change meaning" does not block LeetCode.
+    let base = if base_prompt.trim() == LEGACY_CLEANUP_PROMPT {
+        DEFAULT_CLEANUP_PROMPT
+    } else {
+        base_prompt
+    };
+
     let suffix = match mode {
         OutputMode::CodePreserve => {
-            "Preserve code terms, variable names, and technical vocabulary literally. Do not over-capitalize."
+            "Preserve variable names, identifiers, and code as dictated. Still repair well-known product and platform names that speech-to-text split or misspelled. Do not over-capitalize ordinary words."
         }
         OutputMode::TerminalSafe => {
             "Output plain text only. No smart quotes, no markdown, no formatting. Never add a trailing command or instruction to execute anything."
@@ -145,11 +158,14 @@ pub fn system_prompt_for_mode(mode: OutputMode, base_prompt: &str) -> String {
         OutputMode::PlainText | OutputMode::Balanced => "",
     };
 
-    if suffix.is_empty() {
-        base_prompt.to_string()
-    } else {
-        format!("{base_prompt}\n\n{suffix}")
+    let vocab = vocab::rewrite_vocab_suffix(dictionary);
+
+    let mut parts = vec![base.to_string()];
+    if !suffix.is_empty() {
+        parts.push(suffix.to_string());
     }
+    parts.push(vocab);
+    parts.join("\n\n")
 }
 
 pub fn apply_snippets(text: &str, snippets: &[voxflow_config::Snippet]) -> String {
@@ -163,13 +179,7 @@ pub fn apply_snippets(text: &str, snippets: &[voxflow_config::Snippet]) -> Strin
 }
 
 pub fn apply_dictionary(text: &str, dictionary: &[voxflow_config::DictionaryEntry]) -> String {
-    let mut result = text.to_string();
-    for entry in dictionary {
-        if let Some(replacement) = &entry.replacement {
-            result = result.replace(&entry.term, replacement);
-        }
-    }
-    result
+    vocab::apply_vocabulary(text, dictionary)
 }
 
 #[cfg(test)]
@@ -198,7 +208,10 @@ mod tests {
 
     #[test]
     fn finalize_detects_questions() {
-        assert_eq!(finalize_text("who am i", OutputMode::Balanced), "Who am i? ");
+        assert_eq!(
+            finalize_text("who am i", OutputMode::Balanced),
+            "Who am i? "
+        );
         assert_eq!(
             finalize_text("can you help me", OutputMode::Balanced),
             "Can you help me? "
@@ -223,10 +236,7 @@ mod tests {
 
     #[test]
     fn finalize_leaves_code_and_terminal_alone() {
-        assert_eq!(
-            finalize_text("ls -la", OutputMode::TerminalSafe),
-            "ls -la"
-        );
+        assert_eq!(finalize_text("ls -la", OutputMode::TerminalSafe), "ls -la");
         assert_eq!(
             finalize_text("let x = 1", OutputMode::CodePreserve),
             "let x = 1"
@@ -268,5 +278,27 @@ mod tests {
         let a = finalize_text("first sentence", OutputMode::Balanced);
         let b = finalize_text("second sentence", OutputMode::Balanced);
         assert_eq!(format!("{a}{b}"), "First sentence. Second sentence. ");
+    }
+
+    #[test]
+    fn system_prompt_upgrades_legacy_and_adds_vocab() {
+        let prompt = system_prompt_for_mode(OutputMode::Balanced, LEGACY_CLEANUP_PROMPT, &[]);
+        assert!(prompt.contains("Repair technical terms"));
+        assert!(prompt.contains("LeetCode"));
+        assert!(!prompt.contains("Do NOT change meaning"));
+    }
+
+    #[test]
+    fn system_prompt_code_preserve_still_repairs_products() {
+        let prompt = system_prompt_for_mode(OutputMode::CodePreserve, DEFAULT_CLEANUP_PROMPT, &[]);
+        assert!(prompt.contains("Still repair well-known product"));
+    }
+
+    #[test]
+    fn apply_dictionary_fixes_leetcode_split() {
+        assert_eq!(
+            apply_dictionary("topics from lead code only", &[]),
+            "topics from LeetCode only"
+        );
     }
 }

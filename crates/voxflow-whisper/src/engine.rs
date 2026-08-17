@@ -64,6 +64,7 @@ impl WhisperEngine {
         &self,
         pcm_i16: &[i16],
         sample_rate: u32,
+        initial_prompt: Option<&str>,
     ) -> Result<String, WhisperError> {
         if pcm_i16.is_empty() {
             return Err(WhisperError::EmptyAudio);
@@ -93,14 +94,24 @@ impl WhisperEngine {
             .create_state()
             .map_err(|e| WhisperError::Inference(e.to_string()))?;
 
-        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+        // Beam search is slower than greedy but much better at compound /
+        // proper-noun tokens (handoff vs "hand of", LeetCode vs "lead code").
+        let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+            beam_size: 5,
+            patience: -1.0,
+        });
         params.set_n_threads(num_cpus());
         params.set_translate(false);
         params.set_language(Some("en"));
+        params.set_temperature(0.0);
+        params.set_suppress_non_speech_tokens(true);
         params.set_print_special(false);
         params.set_print_progress(false);
         params.set_print_realtime(false);
         params.set_print_timestamps(false);
+        if let Some(prompt) = initial_prompt.filter(|p| !p.is_empty()) {
+            params.set_initial_prompt(prompt);
+        }
 
         state
             .full(params, &audio_f32)
@@ -167,10 +178,7 @@ pub fn strip_non_speech_markers(text: &str) -> String {
         };
 
         let inner = rest[start + 1..end].trim().to_lowercase();
-        let drop = open == '['
-            || NON_SPEECH_HINTS
-                .iter()
-                .any(|hint| inner.contains(hint));
+        let drop = open == '[' || NON_SPEECH_HINTS.iter().any(|hint| inner.contains(hint));
 
         out.push_str(&rest[..start]);
         if !drop {
@@ -199,7 +207,10 @@ mod marker_tests {
             strip_non_speech_markers("[BLANK_AUDIO] hello there [MUSIC]"),
             "hello there"
         );
-        assert_eq!(strip_non_speech_markers("hi (upbeat music) there"), "hi there");
+        assert_eq!(
+            strip_non_speech_markers("hi (upbeat music) there"),
+            "hi there"
+        );
     }
 
     #[test]

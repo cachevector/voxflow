@@ -12,6 +12,7 @@ use voxflow_history::{new_entry, HistoryStore};
 use voxflow_insert::{InsertResult, InsertionBridge};
 use voxflow_provider::{
     apply_dictionary, apply_rules, apply_snippets, finalize_text, system_prompt_for_mode,
+    whisper_initial_prompt,
 };
 use voxflow_vad::{VoiceActivityDetector, SAMPLE_RATE};
 use voxflow_whisper::WhisperEngine;
@@ -68,7 +69,10 @@ impl DictationPipeline {
     /// Current mic input level (0.0..1.0) for the live overlay waveform.
     /// Returns 0.0 when no capture is active.
     pub fn current_level(&self) -> f32 {
-        self.capture.as_ref().map(|c| c.current_level()).unwrap_or(0.0)
+        self.capture
+            .as_ref()
+            .map(|c| c.current_level())
+            .unwrap_or(0.0)
     }
 
     pub async fn prewarm(&mut self) -> Result<()> {
@@ -151,11 +155,8 @@ impl DictationPipeline {
 
         // Whisper returns "[BLANK_AUDIO]" for anything at room-noise level, which
         // is indistinguishable from a pipeline fault without the captured level.
-        let capture_peak = pcm_i16
-            .iter()
-            .fold(0i16, |m, &s| m.max(s.saturating_abs()))
-            as f32
-            / i16::MAX as f32;
+        let capture_peak =
+            pcm_i16.iter().fold(0i16, |m, &s| m.max(s.saturating_abs())) as f32 / i16::MAX as f32;
         info!(
             samples = pcm_i16.len(),
             peak = capture_peak,
@@ -167,10 +168,7 @@ impl DictationPipeline {
             .trim_silence(&pcm_i16)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
         self.latency.mark_vad_done();
-        info!(
-            trimmed_samples = trim.trimmed.len(),
-            "vad trim complete"
-        );
+        info!(trimmed_samples = trim.trimmed.len(), "vad trim complete");
 
         let settings = self.settings.read().await.clone();
 
@@ -193,9 +191,10 @@ impl DictationPipeline {
         self.latency.mark_transcribe_start();
 
         let model = format!("whisper/{}", settings.whisper.model_id);
+        let initial_prompt = whisper_initial_prompt(&settings.dictionary);
         let raw_transcript = match self
             .whisper
-            .transcribe_pcm_i16(&trim.trimmed, SAMPLE_RATE)
+            .transcribe_pcm_i16(&trim.trimmed, SAMPLE_RATE, Some(&initial_prompt))
             .await
         {
             Ok(t) => t,
@@ -221,8 +220,9 @@ impl DictationPipeline {
         if settings.rewrite_enabled {
             self.state = DictationState::Cleaning;
             let rewrite_client = Self::resolve_client(&settings.rewrite_provider).await;
-            let system_prompt = system_prompt_for_mode(output_mode, &settings.rewrite_prompt);
-            if let Ok(rewritten) = rewrite_client
+            let system_prompt =
+                system_prompt_for_mode(output_mode, &settings.rewrite_prompt, &settings.dictionary);
+            match rewrite_client
                 .chat_rewrite(
                     &transcript_text,
                     &system_prompt,
@@ -230,9 +230,11 @@ impl DictationPipeline {
                 )
                 .await
             {
-                if !rewritten.trim().is_empty() {
+                Ok(rewritten) if !rewritten.trim().is_empty() => {
                     transcript_text = rewritten;
                 }
+                Ok(_) => warn!("rewrite returned empty, keeping local transcript"),
+                Err(e) => warn!("rewrite failed: {e}"),
             }
         }
 

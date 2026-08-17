@@ -213,6 +213,13 @@ pub enum LicenseTier {
     Beta,
 }
 
+/// Grammar-only prompt shipped before technical-term repair. `load_settings`
+/// upgrades saved copies to `DEFAULT_REWRITE_PROMPT`.
+pub const LEGACY_REWRITE_PROMPT: &str = "You clean up dictated speech. Remove filler words and false starts (um, uh, hmm, er). Fix grammar, punctuation, and capitalization. Do NOT change meaning, add content, or rephrase for style. Return ONLY the corrected text with no quotes or markdown.";
+
+/// Default Groq cleanup prompt: grammar, fillers, and technical-term repair.
+pub const DEFAULT_REWRITE_PROMPT: &str = "You clean up dictated speech from a software engineer. Remove filler words and false starts (um, uh, hmm, er). Fix grammar, punctuation, and capitalization. Repair technical terms that speech-to-text commonly splits or misspells (product names, APIs, frameworks, CLI tools, compound words such as handoff or LeetCode). Do NOT add content, invent facts, or rephrase for style. Return ONLY the corrected text with no quotes or markdown.";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhisperConfig {
     /// GGML model id without prefix, e.g. `small.en`.
@@ -287,7 +294,7 @@ impl Default for Settings {
             transcription_provider: ProviderConfig::default_transcription(),
             rewrite_provider: ProviderConfig::default_rewrite(),
             rewrite_enabled: true,
-            rewrite_prompt: "You clean up dictated speech. Remove filler words and false starts (um, uh, hmm, er). Fix grammar, punctuation, and capitalization. Do NOT change meaning, add content, or rephrase for style. Return ONLY the corrected text with no quotes or markdown.".into(),
+            rewrite_prompt: DEFAULT_REWRITE_PROMPT.into(),
             session_cap_seconds: 120,
             clipboard_restore: true,
             launch_at_login: false,
@@ -381,7 +388,10 @@ pub fn load_settings() -> Result<Settings, ConfigError> {
     }
 
     let data = fs::read_to_string(&path)?;
-    let settings: Settings = serde_json::from_str(&data)?;
+    let mut settings: Settings = serde_json::from_str(&data)?;
+    if settings.rewrite_prompt.trim() == LEGACY_REWRITE_PROMPT {
+        settings.rewrite_prompt = DEFAULT_REWRITE_PROMPT.to_string();
+    }
     Ok(settings)
 }
 
@@ -407,6 +417,7 @@ mod tests {
         assert_eq!(s.quality_mode, QualityMode::Hybrid);
         assert!(s.rewrite_enabled);
         assert_eq!(s.max_history_entries(), 50);
+        assert!(s.rewrite_prompt.contains("Repair technical terms"));
     }
 
     #[test]
