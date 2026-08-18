@@ -18,8 +18,8 @@ interface LogoMarkProps {
  * while listening, dimmed while the transcription is being processed.
  */
 export function LogoMark({ amplitude, active }: LogoMarkProps) {
-  // Halo tracks the voice, with a floor so the mark never looks dead on-screen.
-  const glow = active ? 0.35 + Math.min(1, amplitude) * 0.65 : 0.25;
+  // Keep the mark calm and let the waveform carry the live audio feedback.
+  const glow = active ? 0.28 + Math.min(1, amplitude) * 0.18 : 0.18;
 
   return (
     <span
@@ -33,7 +33,7 @@ export function LogoMark({ amplitude, active }: LogoMarkProps) {
           background:
             "radial-gradient(circle, rgba(0,178,197,0.55) 0%, rgba(0,178,197,0) 70%)",
           opacity: glow,
-          transform: `scale(${1 + (active ? Math.min(1, amplitude) * 0.35 : 0)})`,
+          transform: "scale(1.08)",
         }}
       />
       <svg
