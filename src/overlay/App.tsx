@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { commands, events } from "@/shared/tauri";
 import type { StateEvent, UiState, VocabularySuggestion } from "@/shared/types";
@@ -6,16 +6,25 @@ import { Waveform } from "./components/Waveform";
 import { Timer } from "./components/Timer";
 import { LogoMark } from "./components/LogoMark";
 import { BufferingIndicator } from "./components/BufferingIndicator";
+import { StateLabel } from "./components/StateLabel";
 
 export default function App() {
   const [event, setEvent] = useState<StateEvent | null>(null);
   const [amplitude, setAmplitude] = useState(0);
   const [suggestion, setSuggestion] = useState<VocabularySuggestion | null>(null);
+  const latestSession = useRef(0);
   const visible = suggestion !== null || (event !== null && event.ui_state !== "idle");
   const uiState: UiState = event?.ui_state ?? "idle";
 
   useEffect(() => {
-    const unlistenState = events.onDictationState(setEvent);
+    const unlistenState = events.onDictationState((nextEvent) => {
+      if (nextEvent.session_id < latestSession.current) return;
+      if (nextEvent.session_id > latestSession.current) {
+        latestSession.current = nextEvent.session_id;
+        setAmplitude(0);
+      }
+      setEvent(nextEvent);
+    });
     const unlistenAmp = events.onDictationAmplitude(setAmplitude);
     const unlistenSuggestion = events.onVocabularySuggestion(setSuggestion);
     const unlistenSuggestionCleared = events.onVocabularySuggestionCleared(() => setSuggestion(null));
@@ -62,11 +71,33 @@ export default function App() {
                   Not now <span className="sr-only">(Escape)</span>
                 </button>
               </>
+            ) : uiState === "error" ? (
+              <>
+                <LogoMark amplitude={0} active={false} />
+                <StateLabel state={uiState} message={event?.message ?? null} />
+              </>
+            ) : uiState === "listening" ? (
+              <>
+                <LogoMark amplitude={amplitude} active />
+                <Waveform amplitude={amplitude} active />
+                <Timer />
+              </>
+            ) : uiState === "copied" ? (
+              <>
+                <LogoMark amplitude={0} active={false} />
+                <StateLabel state={uiState} message={null} />
+              </>
+            ) : event?.message ? (
+              <>
+                <LogoMark amplitude={0} active={false} />
+                <StateLabel state={uiState} message={event.message} />
+                <BufferingIndicator />
+              </>
             ) : (
               <>
-                <LogoMark amplitude={amplitude} active={uiState === "listening"} />
-                <Waveform amplitude={amplitude} active={uiState === "listening"} />
-                {uiState === "listening" ? <Timer /> : <BufferingIndicator />}
+                <LogoMark amplitude={0} active={false} />
+                <Waveform amplitude={0} active={false} />
+                <BufferingIndicator />
               </>
             )}
           </motion.div>

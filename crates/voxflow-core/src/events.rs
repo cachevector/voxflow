@@ -44,6 +44,8 @@ impl From<DictationState> for UiState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateEvent {
+    #[serde(default)]
+    pub session_id: u64,
     pub state: DictationState,
     pub ui_state: UiState,
     pub message: Option<String>,
@@ -53,6 +55,7 @@ pub struct StateEvent {
 impl StateEvent {
     pub fn new(state: DictationState, message: Option<String>) -> Self {
         Self {
+            session_id: 0,
             ui_state: state.into(),
             state,
             message,

@@ -133,6 +133,7 @@ export type UiState =
   | "error";
 
 export interface StateEvent {
+  session_id: number;
   state: DictationState;
   ui_state: UiState;
   message: string | null;

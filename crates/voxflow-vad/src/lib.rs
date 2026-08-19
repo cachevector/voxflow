@@ -4,6 +4,8 @@ use webrtc_vad::{SampleRate, Vad, VadMode};
 pub const SAMPLE_RATE: u32 = 16_000;
 pub const FRAME_MS: u32 = 30;
 pub const FRAME_SAMPLES: usize = (SAMPLE_RATE as usize * FRAME_MS as usize) / 1000;
+const PRE_ROLL_FRAMES: usize = 5; // 150 ms
+const POST_ROLL_FRAMES: usize = 10; // 300 ms
 
 #[derive(Debug, Error)]
 pub enum VadError {
@@ -51,25 +53,19 @@ impl VoiceActivityDetector {
         }
 
         let raw_duration_secs = pcm.len() as f32 / SAMPLE_RATE as f32;
-        let mut speech_frames = Vec::new();
-        let mut any_speech = false;
+        let mut speech_frame_indices = Vec::new();
 
-        for chunk in pcm.chunks(FRAME_SAMPLES) {
+        for (index, chunk) in pcm.chunks(FRAME_SAMPLES).enumerate() {
             if chunk.len() < FRAME_SAMPLES {
                 break;
             }
             let speech = self.is_speech_frame(chunk)?;
             if speech {
-                any_speech = true;
-                speech_frames.extend_from_slice(chunk);
+                speech_frame_indices.push(index);
             }
         }
 
-        let trimmed = if any_speech {
-            speech_frames
-        } else {
-            pcm.to_vec()
-        };
+        let trimmed = contiguous_speech_span(pcm, &speech_frame_indices);
 
         Ok(TrimResult {
             trimmed_duration_secs: trimmed.len() as f32 / SAMPLE_RATE as f32,
@@ -77,6 +73,18 @@ impl VoiceActivityDetector {
             trimmed,
         })
     }
+}
+
+/// Keep one continuous region around detected speech. Concatenating only the
+/// positive VAD frames removes unvoiced consonants and destroys timing, which
+/// is especially harmful for a single short word.
+fn contiguous_speech_span(pcm: &[i16], speech_frames: &[usize]) -> Vec<i16> {
+    let (Some(&first), Some(&last)) = (speech_frames.first(), speech_frames.last()) else {
+        return pcm.to_vec();
+    };
+    let start = first.saturating_sub(PRE_ROLL_FRAMES) * FRAME_SAMPLES;
+    let end = ((last + 1 + POST_ROLL_FRAMES) * FRAME_SAMPLES).min(pcm.len());
+    pcm[start..end].to_vec()
 }
 
 #[derive(Debug, Clone)]
@@ -102,5 +110,27 @@ mod tests {
         let mut vad = VoiceActivityDetector::default_detector();
         let result = vad.trim_silence(&[]).unwrap();
         assert!(result.trimmed.is_empty());
+    }
+
+    #[test]
+    fn trimming_preserves_contiguous_context_and_gaps() {
+        let pcm: Vec<i16> = (0..30 * FRAME_SAMPLES).map(|i| i as i16).collect();
+        let trimmed = contiguous_speech_span(&pcm, &[10, 12]);
+        assert_eq!(trimmed.first(), pcm.get(5 * FRAME_SAMPLES));
+        assert_eq!(trimmed.len(), 18 * FRAME_SAMPLES);
+        assert!(trimmed.contains(&((11 * FRAME_SAMPLES) as i16)));
+    }
+
+    #[test]
+    fn trailing_partial_frame_is_retained_inside_post_roll() {
+        let pcm = vec![1_i16; 4 * FRAME_SAMPLES + 123];
+        let trimmed = contiguous_speech_span(&pcm, &[3]);
+        assert_eq!(trimmed.len(), pcm.len());
+    }
+
+    #[test]
+    fn no_detected_speech_keeps_full_recording() {
+        let pcm = vec![1_i16; 2 * FRAME_SAMPLES + 17];
+        assert_eq!(contiguous_speech_span(&pcm, &[]), pcm);
     }
 }

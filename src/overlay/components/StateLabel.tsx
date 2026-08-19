@@ -13,7 +13,7 @@ const LABELS: Record<UiState, string> = {
 };
 
 export function StateLabel({ state, message }: { state: UiState; message: string | null }) {
-  const text = state === "error" && message ? message : LABELS[state];
+  const text = message || LABELS[state];
   return (
     <div className="flex-1 overflow-hidden">
       <AnimatePresence mode="wait">
@@ -23,7 +23,7 @@ export function StateLabel({ state, message }: { state: UiState; message: string
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.1 }}
-          className="block truncate text-sm font-medium"
+          className="block truncate text-xs font-medium"
         >
           {text}
         </motion.span>

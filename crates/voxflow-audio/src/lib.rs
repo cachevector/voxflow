@@ -3,6 +3,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, SampleFormat, Stream, StreamConfig};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use thiserror::Error;
@@ -39,6 +40,7 @@ enum AudioCommand {
 /// Send+Sync handle to a background audio capture thread.
 pub struct AudioCapture {
     buffer: Arc<Mutex<Vec<f32>>>,
+    healthy: Arc<AtomicBool>,
     sample_rate: u32,
     _thread: JoinHandle<()>,
     cmd_tx: std::sync::mpsc::Sender<AudioCommand>,
@@ -87,21 +89,35 @@ impl AudioCapture {
 
         let buffer = Arc::new(Mutex::new(Vec::<f32>::new()));
         let buffer_clone = buffer.clone();
+        let healthy = Arc::new(AtomicBool::new(false));
+        let healthy_clone = healthy.clone();
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
+        let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
 
         let thread = thread::spawn(move || {
-            let stream = build_stream(&device, &stream_config, sample_format, buffer_clone);
+            let stream = build_stream(
+                &device,
+                &stream_config,
+                sample_format,
+                buffer_clone,
+                healthy_clone.clone(),
+            );
             let stream = match stream {
                 Ok(s) => s,
                 Err(e) => {
                     warn!("failed to build audio stream: {e}");
+                    let _ = ready_tx.send(Err(e.to_string()));
                     return;
                 }
             };
+            healthy_clone.store(true, Ordering::SeqCst);
             if let Err(e) = stream.play() {
+                healthy_clone.store(false, Ordering::SeqCst);
                 warn!("failed to play stream: {e}");
+                let _ = ready_tx.send(Err(e.to_string()));
                 return;
             }
+            let _ = ready_tx.send(Ok(()));
             loop {
                 match cmd_rx.recv_timeout(std::time::Duration::from_millis(100)) {
                     Ok(AudioCommand::Shutdown)
@@ -109,11 +125,23 @@ impl AudioCapture {
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 }
             }
+            healthy_clone.store(false, Ordering::SeqCst);
             drop(stream);
         });
 
+        match ready_rx.recv_timeout(std::time::Duration::from_secs(2)) {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => return Err(AudioError::Stream(error).into()),
+            Err(error) => {
+                return Err(
+                    AudioError::Stream(format!("timed out starting input stream: {error}")).into(),
+                )
+            }
+        }
+
         Ok(Self {
             buffer,
+            healthy,
             sample_rate,
             _thread: thread,
             cmd_tx,
@@ -126,6 +154,10 @@ impl AudioCapture {
 
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
+    }
+
+    pub fn is_healthy(&self) -> bool {
+        self.healthy.load(Ordering::SeqCst)
     }
 
     /// Peak-normalized loudness of the most recently captured audio, without
@@ -210,12 +242,16 @@ fn build_stream(
     stream_config: &StreamConfig,
     sample_format: SampleFormat,
     buffer: Arc<Mutex<Vec<f32>>>,
+    healthy: Arc<AtomicBool>,
 ) -> Result<Stream> {
     match sample_format {
         SampleFormat::F32 => device.build_input_stream(
             stream_config,
             move |data: &[f32], _| buffer.lock().extend_from_slice(data),
-            |err| warn!("audio stream error: {err}"),
+            move |err| {
+                healthy.store(false, Ordering::SeqCst);
+                warn!("audio stream error: {err}");
+            },
             None,
         ),
         SampleFormat::I16 => device.build_input_stream(
@@ -225,7 +261,10 @@ fn build_stream(
                     data.iter().map(|&s| s as f32 / i16::MAX as f32).collect();
                 buffer.lock().extend_from_slice(&converted);
             },
-            |err| warn!("audio stream error: {err}"),
+            move |err| {
+                healthy.store(false, Ordering::SeqCst);
+                warn!("audio stream error: {err}");
+            },
             None,
         ),
         SampleFormat::U16 => device.build_input_stream(
@@ -237,7 +276,10 @@ fn build_stream(
                     .collect();
                 buffer.lock().extend_from_slice(&converted);
             },
-            |err| warn!("audio stream error: {err}"),
+            move |err| {
+                healthy.store(false, Ordering::SeqCst);
+                warn!("audio stream error: {err}");
+            },
             None,
         ),
         _ => anyhow::bail!("unsupported sample format"),

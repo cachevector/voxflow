@@ -109,6 +109,15 @@ impl DictationPipeline {
         self.latency.mark_hotkey_down();
         self.state = DictationState::Listening;
 
+        if self
+            .capture
+            .as_ref()
+            .is_some_and(|capture| !capture.is_healthy())
+        {
+            warn!("audio capture became unhealthy; reopening input stream");
+            self.capture = None;
+        }
+
         if self.capture.is_none() {
             let device = self.settings.read().await.microphone_device.clone();
             match AudioCapture::open(device.as_deref()) {
@@ -208,7 +217,7 @@ impl DictationPipeline {
 
         let model = format!("whisper/{}", settings.whisper.model_id);
         let initial_prompt = whisper_initial_prompt(&settings.dictionary);
-        let raw_transcript = match self
+        let mut raw_transcript = match self
             .whisper
             .transcribe_pcm_i16(&trim.trimmed, SAMPLE_RATE, Some(&initial_prompt))
             .await
@@ -216,6 +225,26 @@ impl DictationPipeline {
             Ok(t) => t,
             Err(e) => return Ok(self.error_result(format!("Transcription failed: {e}"))),
         };
+
+        // Whisper can classify a very short valid word as blank after VAD. One
+        // bounded retry with the original timing and explicit silence context
+        // is cheap locally and avoids losing the whole utterance.
+        if raw_transcript.trim().is_empty() && trim.raw_duration_secs <= 2.0 {
+            let retry_audio = pad_with_silence(&pcm_i16, SAMPLE_RATE / 4);
+            info!(
+                raw_samples = pcm_i16.len(),
+                retry_samples = retry_audio.len(),
+                "retrying short empty transcript with untrimmed padded audio"
+            );
+            match self
+                .whisper
+                .transcribe_pcm_i16(&retry_audio, SAMPLE_RATE, Some(&initial_prompt))
+                .await
+            {
+                Ok(text) => raw_transcript = text,
+                Err(error) => warn!("short utterance retry failed: {error}"),
+            }
+        }
 
         self.latency.mark_transcribe_done();
 
@@ -325,6 +354,7 @@ impl DictationPipeline {
 
         let latency_ms = report.total_ms.unwrap_or(0);
         let event = StateEvent {
+            session_id: 0,
             state: self.state,
             ui_state: self.state.into(),
             message: None,
@@ -562,6 +592,15 @@ impl DictationPipeline {
     }
 }
 
+fn pad_with_silence(pcm: &[i16], samples_each_side: u32) -> Vec<i16> {
+    let padding = samples_each_side as usize;
+    let mut padded = Vec::with_capacity(pcm.len() + padding * 2);
+    padded.resize(padding, 0);
+    padded.extend_from_slice(pcm);
+    padded.resize(padded.len() + padding, 0);
+    padded
+}
+
 fn vocabulary_suggestion(original: &str, corrected: &str) -> Option<VocabularySuggestion> {
     let original_words: Vec<&str> = original.split_whitespace().collect();
     let corrected_words: Vec<&str> = corrected.split_whitespace().collect();
@@ -666,5 +705,11 @@ mod correction_tests {
     #[test]
     fn ignores_common_word_replacements() {
         assert!(vocabulary_suggestion("I went home", "I go home").is_none());
+    }
+
+    #[test]
+    fn short_utterance_padding_preserves_audio() {
+        let padded = pad_with_silence(&[4, 5, 6], 2);
+        assert_eq!(padded, vec![0, 0, 4, 5, 6, 0, 0]);
     }
 }

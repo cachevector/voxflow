@@ -36,6 +36,7 @@ pub fn spawn(state: Arc<AppState>, overlay_tx: async_channel::Sender<StateEvent>
                 listening = false;
                 let event = match engine.on_hotkey_up(None) {
                     Ok(result) => StateEvent {
+                        session_id: 0,
                         ui_state: result.state.into(),
                         state: result.state,
                         message: None,

@@ -1,11 +1,14 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize};
 
 pub const OVERLAY_LABEL: &str = "overlay";
 pub const MAIN_LABEL: &str = "main";
 const OVERLAY_BOTTOM_MARGIN: f64 = 48.0;
+static OVERLAY_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 pub fn show_overlay(app: &AppHandle) {
+    OVERLAY_GENERATION.fetch_add(1, Ordering::SeqCst);
     if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
         position_overlay_bottom_center(app, &window);
         let _ = window.show();
@@ -53,9 +56,12 @@ pub fn hide_overlay(app: &AppHandle) {
 
 /// Hides the overlay after a short delay so the transition out is smooth.
 pub fn hide_overlay_after(app: AppHandle, delay: Duration) {
+    let generation = OVERLAY_GENERATION.load(Ordering::SeqCst);
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(delay).await;
-        hide_overlay(&app);
+        if OVERLAY_GENERATION.load(Ordering::SeqCst) == generation {
+            hide_overlay(&app);
+        }
     });
 }
 
